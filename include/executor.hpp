@@ -1,0 +1,22 @@
+#ifndef EXECUTOR_H_
+#define EXECUTOR_H_
+
+#include "cpu.hpp"
+#include "decoder.hpp"
+#include <cstdint>
+#include <optional>
+
+class Memory;
+
+enum class TrapCause {
+	EnvironmentCall,
+	BreakPoint
+};
+
+struct Trap {
+	TrapCause cause;
+};
+
+std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& instruction, Memory& memory);
+
+#endif

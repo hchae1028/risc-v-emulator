@@ -1,0 +1,12 @@
+.DS_Store
+build/
+cmake-build-*/
+.vscode/
+*.swp
+*.swo
+*.log
+
+CMakeUserPresets.json
+
+.cache/
+compile_commands.json

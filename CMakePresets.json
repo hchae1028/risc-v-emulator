@@ -1,0 +1,14 @@
+{
+	"version": 4,
+	"configurePresets": [
+		{
+			"name": "risc-v-emulator",
+			"displayName": "RISC-V Emulator Preset",
+			"description": "Preset to use build the RISC-V emulator",
+			"binaryDir": "${sourceDir}/build",
+			"cacheVariables": {
+				"CMAKE_EXPORT_COMPILE_COMMANDS": true
+			}
+		}
+	]
+}
