@@ -1,4 +1,5 @@
 #include "elf_loader.hpp"
+#include "memory.hpp"
 #include <bit>
 #include <cstddef>
 #include <stdexcept>
@@ -94,7 +95,7 @@ Elf32Header parse_elf32_header(std::span<const std::uint8_t> bytes) {
 	};
 }
 
-std::vector<Elf32LoadSegment> parse_elf32_load_segments(std::span<const std::uint8_t> bytes, Elf32Header header) {
+std::vector<Elf32LoadSegment> parse_elf32_load_segments(std::span<const std::uint8_t> bytes, const Elf32Header& header) {
 	std::vector<Elf32LoadSegment> segments{};
 
 	for (std::size_t i{}; i < header.program_header_count; i++) {
@@ -141,4 +142,60 @@ std::vector<Elf32LoadSegment> parse_elf32_load_segments(std::span<const std::uin
 	}
 
 	return segments;
+}
+
+void load_elf_segments(Memory& memory, std::span<const std::uint8_t> bytes, std::span<const Elf32LoadSegment> segments) {
+	constexpr std::uint64_t address_space_size{ 0x1'0000'0000ull };
+
+	// Validate every segment before modifying memory
+    for (std::size_t i{}; i < segments.size(); i++) {
+        const auto& segment{ segments[i] };
+
+        if (segment.paddr != 0 && segment.paddr != segment.vaddr) {
+            throw std::runtime_error{ "error: separate physical load addresses are unsupported" };
+        }
+
+        auto start{ static_cast<std::uint64_t>(segment.vaddr) };
+        auto size{ static_cast<std::uint64_t>(segment.memsz) };
+        auto end{ start + size };
+
+        if (end > address_space_size) {
+            throw std::runtime_error{ "error: PT_LOAD memory range wraps address space" };
+        }
+
+        if (end > memory.size()) {
+            throw std::runtime_error{ "error: PT_LOAD memory range is out of bounds" };
+        }
+
+        if (segment.memsz == 0) {
+            continue;
+        }
+
+        for (std::size_t j{}; j < i; j++) {
+            const auto& other{ segments[j] };
+
+            if (other.memsz == 0) {
+                continue;
+            }
+
+			auto other_start{ static_cast<std::uint64_t>(other.vaddr) };
+            auto other_end{ other_start + static_cast<std::uint64_t>(other.memsz) };
+
+            if (start < other_end && other_start < end) {
+                throw std::runtime_error{ "error: overlapping PT_LOAD memory ranges" };
+            }
+        }
+    }
+
+	for (const auto& segment: segments) {
+		auto file_offset{ static_cast<std::size_t>(segment.offset) };
+		auto file_size{ static_cast<std::size_t>(segment.filesz) };
+
+		memory.load_bytes(segment.vaddr, bytes.subspan(file_offset, file_size));
+		
+		// segment tail containing .bss section filled with zeroes on RAM
+		for (std::uint32_t i{ segment.filesz }; i < segment.memsz; i++) {
+			memory.write8(segment.vaddr + i, 0);
+		}
+	}
 }

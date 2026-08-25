@@ -1,4 +1,5 @@
 #include "elf_loader.hpp"
+#include "memory.hpp"
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -57,6 +58,29 @@ void assert_rejected(const std::vector<std::uint8_t>& bytes) {
 	try {
 		auto header{ parse_elf32_header(bytes) };
 		static_cast<void>(parse_elf32_load_segments(bytes, header));
+	} catch (const std::runtime_error& e) {
+		exception_thrown = true;
+	}
+	assert(exception_thrown);
+}
+
+void fill_memory(Memory& memory, std::uint8_t value) {
+	for (std::size_t i{}; i < memory.size(); i++) {
+		memory.write8(static_cast<std::uint32_t>(i), value);
+	}
+}
+
+void assert_memory_filled(const Memory& memory, std::uint8_t value) {
+	for (std::size_t i{}; i < memory.size(); i++) {
+		assert(memory.read8(static_cast<std::uint32_t>(i)) == value);
+	}
+}
+
+void assert_load_rejected(Memory& memory, const std::vector<std::uint8_t>& bytes,
+						  const std::vector<Elf32LoadSegment>& segments) {
+	bool exception_thrown{ false };
+	try {
+		load_elf_segments(memory, bytes, segments);
 	} catch (const std::runtime_error& e) {
 		exception_thrown = true;
 	}
@@ -266,7 +290,7 @@ int main() {
 
 	/* Non-power-of-two alignment is rejected */
 	segment_bytes = make_valid_elf();
-	write_program_header(segment_bytes, 52, 1, 84, 0x1000u, 0, 0, 0, 0, 3);
+	write_program_header(segment_bytes, 52, 1, 84, 0x1053u, 0, 0, 0, 0, 3);
 	assert_rejected(segment_bytes);
 
 	/* Incongruent offset and virtual address are rejected */
@@ -280,6 +304,173 @@ int main() {
 	segments = parse_elf32_load_segments(segment_bytes, segment_header);
 
 	assert(segments.empty());
+
+	/* Parsed file bytes are loaded at p_vaddr and the remaining memory is zero-filled */
+	segment_bytes = make_valid_elf();
+	segment_bytes.resize(88);
+	segment_bytes[84] = 0x11u;
+	segment_bytes[85] = 0x22u;
+	segment_bytes[86] = 0x33u;
+	segment_bytes[87] = 0x44u;
+	write_program_header(segment_bytes, 52, 1, 84, 4, 4, 4, 8, 0xFFFFFFFFu, 4);
+
+	segment_header = parse_elf32_header(segment_bytes);
+	segments = parse_elf32_load_segments(segment_bytes, segment_header);
+
+	Memory loaded_memory{ 12 };
+	fill_memory(loaded_memory, 0xA5u);
+	load_elf_segments(loaded_memory, segment_bytes, segments);
+
+	for (std::uint32_t address{}; address < 4; address++) {
+		assert(loaded_memory.read8(address) == 0xA5u);
+	}
+	assert(loaded_memory.read8(4) == 0x11u);
+	assert(loaded_memory.read8(5) == 0x22u);
+	assert(loaded_memory.read8(6) == 0x33u);
+	assert(loaded_memory.read8(7) == 0x44u);
+	for (std::uint32_t address{ 8 }; address < 12; address++) {
+		assert(loaded_memory.read8(address) == 0);
+	}
+
+	/* A segment with no file-backed bytes still zero-fills its complete memory range */
+	const std::vector<std::uint8_t> no_file_bytes{};
+	const std::vector<Elf32LoadSegment> zero_fill_segments{
+		Elf32LoadSegment{
+			.offset = 0,
+			.vaddr = 2,
+			.paddr = 0,
+			.filesz = 0,
+			.memsz = 3,
+			.flags = 0,
+			.align = 1
+		}
+	};
+	Memory zero_fill_memory{ 8 };
+	fill_memory(zero_fill_memory, 0xA5u);
+	load_elf_segments(zero_fill_memory, no_file_bytes, zero_fill_segments);
+	assert(zero_fill_memory.read8(1) == 0xA5u);
+	assert(zero_fill_memory.read8(2) == 0);
+	assert(zero_fill_memory.read8(3) == 0);
+	assert(zero_fill_memory.read8(4) == 0);
+	assert(zero_fill_memory.read8(5) == 0xA5u);
+
+	/* Adjacent segment ranges do not overlap */
+	const std::vector<std::uint8_t> adjacent_bytes{ 0x10u, 0x20u, 0x30u, 0x40u };
+	const std::vector<Elf32LoadSegment> adjacent_segments{
+		Elf32LoadSegment{
+			.offset = 0,
+			.vaddr = 1,
+			.paddr = 1,
+			.filesz = 2,
+			.memsz = 2,
+			.flags = 0x5u,
+			.align = 1
+		},
+		Elf32LoadSegment{
+			.offset = 2,
+			.vaddr = 3,
+			.paddr = 3,
+			.filesz = 2,
+			.memsz = 2,
+			.flags = 0x6u,
+			.align = 1
+		}
+	};
+	Memory adjacent_memory{ 6 };
+	fill_memory(adjacent_memory, 0xA5u);
+	load_elf_segments(adjacent_memory, adjacent_bytes, adjacent_segments);
+	assert(adjacent_memory.read8(0) == 0xA5u);
+	assert(adjacent_memory.read8(1) == 0x10u);
+	assert(adjacent_memory.read8(2) == 0x20u);
+	assert(adjacent_memory.read8(3) == 0x30u);
+	assert(adjacent_memory.read8(4) == 0x40u);
+	assert(adjacent_memory.read8(5) == 0xA5u);
+
+	/* Overlapping memory ranges are rejected before either segment is written */
+	const std::vector<Elf32LoadSegment> overlapping_segments{
+		Elf32LoadSegment{
+			.offset = 0,
+			.vaddr = 1,
+			.paddr = 0,
+			.filesz = 2,
+			.memsz = 3,
+			.flags = 0,
+			.align = 1
+		},
+		Elf32LoadSegment{
+			.offset = 2,
+			.vaddr = 3,
+			.paddr = 0,
+			.filesz = 2,
+			.memsz = 2,
+			.flags = 0,
+			.align = 1
+		}
+	};
+	Memory overlapping_memory{ 8 };
+	fill_memory(overlapping_memory, 0xA5u);
+	assert_load_rejected(overlapping_memory, adjacent_bytes, overlapping_segments);
+	assert_memory_filled(overlapping_memory, 0xA5u);
+
+	/* A later out-of-range segment cannot leave an earlier valid segment loaded */
+	const std::vector<Elf32LoadSegment> partially_valid_segments{
+		Elf32LoadSegment{
+			.offset = 0,
+			.vaddr = 0,
+			.paddr = 0,
+			.filesz = 2,
+			.memsz = 2,
+			.flags = 0,
+			.align = 1
+		},
+		Elf32LoadSegment{
+			.offset = 2,
+			.vaddr = 7,
+			.paddr = 0,
+			.filesz = 2,
+			.memsz = 2,
+			.flags = 0,
+			.align = 1
+		}
+	};
+	Memory all_or_nothing_memory{ 8 };
+	fill_memory(all_or_nothing_memory, 0xA5u);
+	assert_load_rejected(all_or_nothing_memory, adjacent_bytes, partially_valid_segments);
+	assert_memory_filled(all_or_nothing_memory, 0xA5u);
+
+	/* A range that crosses the end of the 32-bit address space is rejected */
+	const std::vector<Elf32LoadSegment> wrapping_segments{
+		Elf32LoadSegment{
+			.offset = 0,
+			.vaddr = 0xFFFFFFFEu,
+			.paddr = 0,
+			.filesz = 0,
+			.memsz = 3,
+			.flags = 0,
+			.align = 1
+		}
+	};
+	Memory wrapping_memory{ 8 };
+	fill_memory(wrapping_memory, 0xA5u);
+	assert_load_rejected(wrapping_memory, no_file_bytes, wrapping_segments);
+	assert_memory_filled(wrapping_memory, 0xA5u);
+
+	/* Distinct nonzero physical and virtual addresses are unsupported */
+	const std::vector<Elf32LoadSegment> separate_address_segments{
+		Elf32LoadSegment{
+			.offset = 0,
+			.vaddr = 1,
+			.paddr = 2,
+			.filesz = 1,
+			.memsz = 1,
+			.flags = 0,
+			.align = 1
+		}
+	};
+	Memory separate_address_memory{ 8 };
+	fill_memory(separate_address_memory, 0xA5u);
+	assert_load_rejected(separate_address_memory, adjacent_bytes, separate_address_segments);
+	assert_memory_filled(separate_address_memory, 0xA5u);
 
 	return 0;
 }
