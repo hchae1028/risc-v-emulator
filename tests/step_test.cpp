@@ -42,14 +42,17 @@ int main() {
 		registers_before_error[i] = cpu.read_register(i);
 	}
 
-	// Unknown instruction leaves PC and registers unchanged
-	bool exception_thrown{ false };
+	// Unknown instruction traps and leaves PC and registers unchanged
+	bool illegal_trap_thrown{ false };
+	TrapCause illegal_trap_cause{ TrapCause::BreakPoint };
 	try {
 		cpu.step(memory);
-	} catch (const std::runtime_error& e) {
-		exception_thrown = true;
+	} catch (const Trap& trap) {
+		illegal_trap_thrown = true;
+		illegal_trap_cause = trap.cause;
 	}
-	assert(exception_thrown);
+	assert(illegal_trap_thrown);
+	assert(illegal_trap_cause == TrapCause::IllegalInstruction);
 	assert(cpu.read_pc() == 12);
 	for (std::size_t i = 0; i < registers_before_error.size(); i++) {
 		assert(cpu.read_register(i) == registers_before_error[i]);
@@ -57,11 +60,12 @@ int main() {
 
 	// Aligned out-of-range PC leaves state unchanged
 	cpu.set_pc(64);
-	exception_thrown = false;
+	bool exception_thrown{ false };
 	try {
 		cpu.step(memory);
-	} catch (const std::out_of_range& e) {
+	} catch (const Trap& trap) {
 		exception_thrown = true;
+		assert(trap.cause == TrapCause::InstructionAccessFault);
 	}
 	assert(exception_thrown);
 	assert(cpu.read_pc() == 64);
@@ -230,8 +234,9 @@ int main() {
 	bool load_exception_thrown{ false };
 	try {
 		failed_load_cpu.step(failed_load_memory);
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		load_exception_thrown = true;
+		assert(trap.cause == TrapCause::LoadAddressMisaligned);
 	}
 	assert(load_exception_thrown);
 	assert(failed_load_cpu.read_pc() == 0);
@@ -273,8 +278,9 @@ int main() {
 	bool store_exception_thrown{ false };
 	try {
 		failed_store_cpu.step(failed_store_memory);
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		store_exception_thrown = true;
+		assert(trap.cause == TrapCause::StoreAddressMisaligned);
 	}
 	assert(store_exception_thrown);
 	assert(failed_store_cpu.read_pc() == 0);
@@ -307,8 +313,9 @@ int main() {
 	bool byte_load_exception_thrown{ false };
 	try {
 		failed_byte_load_cpu.step(failed_byte_load_memory);
-	} catch (const std::out_of_range& e) {
+	} catch (const Trap& trap) {
 		byte_load_exception_thrown = true;
+		assert(trap.cause == TrapCause::LoadAccessFault);
 	}
 	assert(byte_load_exception_thrown);
 	assert(failed_byte_load_cpu.read_pc() == 0);
@@ -346,8 +353,9 @@ int main() {
 	bool byte_store_exception_thrown{ false };
 	try {
 		failed_byte_store_cpu.step(failed_byte_store_memory);
-	} catch (const std::out_of_range& e) {
+	} catch (const Trap& trap) {
 		byte_store_exception_thrown = true;
+		assert(trap.cause == TrapCause::StoreAccessFault);
 	}
 	assert(byte_store_exception_thrown);
 	assert(failed_byte_store_cpu.read_pc() == 0);
@@ -382,8 +390,9 @@ int main() {
 	bool halfword_load_exception_thrown{ false };
 	try {
 		failed_halfword_load_cpu.step(failed_halfword_load_memory);
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		halfword_load_exception_thrown = true;
+		assert(trap.cause == TrapCause::LoadAddressMisaligned);
 	}
 	assert(halfword_load_exception_thrown);
 	assert(failed_halfword_load_cpu.read_pc() == 0);
@@ -421,8 +430,9 @@ int main() {
 	bool halfword_store_exception_thrown{ false };
 	try {
 		failed_halfword_store_cpu.step(failed_halfword_store_memory);
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		halfword_store_exception_thrown = true;
+		assert(trap.cause == TrapCause::StoreAddressMisaligned);
 	}
 	assert(halfword_store_exception_thrown);
 	assert(failed_halfword_store_cpu.read_pc() == 0);
@@ -481,8 +491,9 @@ int main() {
 	bool branch_exception_thrown{ false };
 	try {
 		failed_branch_cpu.step(failed_branch_memory);
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		branch_exception_thrown = true;
+		assert(trap.cause == TrapCause::InstructionAddressMisaligned);
 	}
 	assert(branch_exception_thrown);
 	assert(failed_branch_cpu.read_pc() == 0);
@@ -655,8 +666,9 @@ int main() {
 	bool jal_exception_thrown{ false };
 	try {
 		failed_jal_cpu.step(failed_jal_memory);
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		jal_exception_thrown = true;
+		assert(trap.cause == TrapCause::InstructionAddressMisaligned);
 	}
 	assert(jal_exception_thrown);
 	assert(failed_jal_cpu.read_pc() == 0);
@@ -700,8 +712,9 @@ int main() {
 	bool jalr_exception_thrown{ false };
 	try {
 		failed_jalr_cpu.step(failed_jalr_memory);
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		jalr_exception_thrown = true;
+		assert(trap.cause == TrapCause::InstructionAddressMisaligned);
 	}
 	assert(jalr_exception_thrown);
 	assert(failed_jalr_cpu.read_pc() == 0);
@@ -746,18 +759,21 @@ int main() {
 	assert(fence_memory.read32(8) == 0x0FF1008Fu);
 	assert(fence_memory.read32(12) == 0x00700193u);
 
-	// FENCE.I remains unknown and leaves state unchanged through step
+	// FENCE.I is unsupported and traps without changing architectural state
 	Cpu fence_i_cpu{};
 	Memory fence_i_memory{ 4 };
 	fence_i_cpu.write_register(1, 0x12345678u);
 	fence_i_memory.write32(0, 0x0000100F);
-	bool fence_i_exception_thrown{ false };
+	bool fence_i_trap_thrown{ false };
+	TrapCause fence_i_trap_cause{ TrapCause::BreakPoint };
 	try {
 		fence_i_cpu.step(fence_i_memory);
-	} catch (const std::runtime_error& e) {
-		fence_i_exception_thrown = true;
+	} catch (const Trap& trap) {
+		fence_i_trap_thrown = true;
+		fence_i_trap_cause = trap.cause;
 	}
-	assert(fence_i_exception_thrown);
+	assert(fence_i_trap_thrown);
+	assert(fence_i_trap_cause == TrapCause::IllegalInstruction);
 	assert(fence_i_cpu.read_pc() == 0);
 	assert(fence_i_cpu.read_register(1) == 0x12345678u);
 	assert(fence_i_memory.read32(0) == 0x0000100Fu);
@@ -814,8 +830,9 @@ int main() {
 	exception_thrown = false;
 	try {
 		cpu.step(memory);
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		exception_thrown = true;
+		assert(trap.cause == TrapCause::InstructionAddressMisaligned);
 	}
 	assert(exception_thrown);
 	assert(cpu.read_pc() == 2);

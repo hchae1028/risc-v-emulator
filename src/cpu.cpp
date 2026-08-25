@@ -21,10 +21,14 @@ void Cpu::write_register(std::size_t index, std::uint32_t value) {
 
 std::uint32_t Cpu::fetch_instruction(const Memory& memory) const {
 	if (m_pc % 4 != 0) {
-		throw std::runtime_error("error: misaligned PC");
+		throw Trap{ TrapCause::InstructionAddressMisaligned };
 	}
-
-	return memory.read32(m_pc);
+	
+	try {
+		return memory.read32(m_pc);
+	} catch (const std::out_of_range&) {
+		throw Trap{ TrapCause::InstructionAccessFault };
+	}
 }
 
 void Cpu::step(Memory& memory) {

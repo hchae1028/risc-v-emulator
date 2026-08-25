@@ -10,7 +10,14 @@ class Memory;
 
 enum class TrapCause {
 	EnvironmentCall,
-	BreakPoint
+	BreakPoint,
+	IllegalInstruction,
+	InstructionAddressMisaligned,
+	LoadAddressMisaligned,
+	StoreAddressMisaligned,
+	InstructionAccessFault,
+	LoadAccessFault,
+	StoreAccessFault
 };
 
 struct Trap {

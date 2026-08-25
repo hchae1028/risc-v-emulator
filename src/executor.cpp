@@ -141,10 +141,16 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 		case Operation::Lw: {
 			auto address{ cpu.read_register(instruction.rs1) + instruction.imm };
 			if (address % 4 != 0) {
-				throw std::runtime_error("error: misaligned lw address");
+				throw Trap{ TrapCause::LoadAddressMisaligned };
+			}
+			
+			std::uint32_t value{};
+			try {
+				value = memory.read32(address);
+			} catch (const std::out_of_range&) {
+				throw Trap{ TrapCause::LoadAccessFault };
 			}
 
-			auto value{ memory.read32(address) };
 			cpu.write_register(instruction.rd, value);
 			break;
 		}
@@ -152,16 +158,27 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 		case Operation::Sw: {
 			auto address{ cpu.read_register(instruction.rs1) + instruction.imm };
 			if (address % 4 != 0) {
-				throw std::runtime_error("error: misaligned sw address");
+				throw Trap{ TrapCause::StoreAddressMisaligned };
 			}
-
-			memory.write32(address, cpu.read_register(instruction.rs2));
+			
+			try {
+				memory.write32(address, cpu.read_register(instruction.rs2));
+			} catch (const std::out_of_range&) {
+				throw Trap{ TrapCause::StoreAccessFault };
+			}
 			break;
 		}
 
 		case Operation::Lb: {
 			auto address{ cpu.read_register(instruction.rs1) + instruction.imm };
-			std::uint32_t result{ memory.read8(address) };
+			std::uint32_t result{};
+
+			try {
+				result = memory.read8(address);
+			} catch (const std::out_of_range&) {
+				throw Trap{ TrapCause::LoadAccessFault };
+			}
+
 			if ((result & 0x80u) != 0) {
 				result |= 0xFFFFFF00u;
 			}
@@ -172,25 +189,45 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 
 		case Operation::Lbu: {
 			auto address{ cpu.read_register(instruction.rs1) + instruction.imm };
-			std::uint32_t result{ memory.read8(address) };
+			std::uint32_t result{};
+
+			try {
+				result = memory.read8(address);
+			} catch (const std::out_of_range&) {
+				throw Trap{ TrapCause::LoadAccessFault };
+			}
+
 			cpu.write_register(instruction.rd, result);
 			break;
 		}
 
 		case Operation::Sb: {
 			auto address{ cpu.read_register(instruction.rs1) + instruction.imm };
-			auto value{ static_cast<std::uint8_t>(cpu.read_register(instruction.rs2))};
-			memory.write8(address, value);
+			
+			std::uint8_t value{};
+			try {
+				value = static_cast<std::uint8_t>(cpu.read_register(instruction.rs2));
+				memory.write8(address, value);
+			} catch (const std::out_of_range&) {
+				throw Trap{ TrapCause::StoreAccessFault };
+			}
+
 			break;
 		}
 
 		case Operation::Lh: {
 			auto address{ cpu.read_register(instruction.rs1) + instruction.imm };
 			if (address % 2 != 0) {
-				throw std::runtime_error("error: misaligned lh address");
+				throw Trap{ TrapCause::LoadAddressMisaligned };
 			}
 
-			std::uint32_t result{ memory.read16(address) };
+			std::uint32_t result{};
+			try {
+				result = memory.read16(address);
+			} catch (const std::out_of_range&) {
+				throw Trap{ TrapCause::LoadAccessFault };
+			}
+
 			if ((result & 0x8000u) != 0) {
 				result |= 0xFFFF0000u;
 			}
@@ -202,10 +239,16 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 		case Operation::Lhu: {
 			auto address{ cpu.read_register(instruction.rs1) + instruction.imm };
 			if (address % 2 != 0) {
-				throw std::runtime_error("error: misaligned lhu address");
+				throw Trap{ TrapCause::LoadAddressMisaligned };
 			}
 
-			std::uint32_t result{ memory.read16(address) };
+			std::uint32_t result{};
+			try {
+				result = memory.read16(address);
+			} catch (const std::out_of_range&) {
+				throw Trap{ TrapCause::LoadAccessFault };
+			}	
+
 			cpu.write_register(instruction.rd, result);
 			break;
 		}
@@ -213,11 +256,17 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 		case Operation::Sh: {
 			auto address{ cpu.read_register(instruction.rs1) + instruction.imm };
 			if (address % 2 != 0) {
-				throw std::runtime_error("error: misaligned sh address");
+				throw Trap{ TrapCause::StoreAddressMisaligned };
 			}
 
-			auto value{ static_cast<std::uint16_t>(cpu.read_register(instruction.rs2)) };
-			memory.write16(address, value);
+			std::uint16_t value{};
+			try {
+				value = static_cast<std::uint16_t>(cpu.read_register(instruction.rs2));
+				memory.write16(address, value);
+			} catch (const std::out_of_range&) {
+				throw Trap{ TrapCause::StoreAccessFault };
+			}
+
 			break;
 		}
 
@@ -226,7 +275,7 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			if (branch_taken) {
 				auto new_pc{ cpu.read_pc() + instruction.imm };
 				if (new_pc % 4 != 0) {
-					throw std::runtime_error("error: misaligned beq address");
+					throw Trap{ TrapCause::InstructionAddressMisaligned };
 				}
 
 				return new_pc;
@@ -240,7 +289,7 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			if (branch_taken) {
 				auto new_pc{ cpu.read_pc() + instruction.imm };
 				if (new_pc % 4 != 0) {
-					throw std::runtime_error("error: misaligned bne address");
+					throw Trap{ TrapCause::InstructionAddressMisaligned };
 				}
 
 				return new_pc;
@@ -257,7 +306,7 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			if (branch_taken) {
 				auto new_pc{ cpu.read_pc() + instruction.imm };
 				if (new_pc % 4 != 0) {
-					throw std::runtime_error("error: misaligned blt address");
+					throw Trap{ TrapCause::InstructionAddressMisaligned };
 				}
 
 				return new_pc;
@@ -274,7 +323,7 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			if (branch_taken) {
 				auto new_pc{ cpu.read_pc() + instruction.imm };
 				if (new_pc % 4 != 0) {
-					throw std::runtime_error("error: misaligned bge address");
+					throw Trap{ TrapCause::InstructionAddressMisaligned };
 				}
 
 				return new_pc;
@@ -288,7 +337,7 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			if (branch_taken) {
 				auto new_pc{ cpu.read_pc() + instruction.imm };
 				if (new_pc % 4 != 0) {
-					throw std::runtime_error("error: misaligned bltu address");
+					throw Trap{ TrapCause::InstructionAddressMisaligned };
 				}
 
 				return new_pc;
@@ -301,7 +350,7 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			if (branch_taken) {
 				auto new_pc{ cpu.read_pc() + instruction.imm };
 				if (new_pc % 4 != 0) {
-					throw std::runtime_error("error: misaligned bgeu address");
+					throw Trap{ TrapCause::InstructionAddressMisaligned };
 				}
 
 				return new_pc;
@@ -317,7 +366,7 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 		case Operation::Jal: {
 			auto target{ cpu.read_pc() + instruction.imm };
 			if (target % 4 != 0) {
-				throw std::runtime_error("error: misaligned target for jal");
+				throw Trap{ TrapCause::InstructionAddressMisaligned };
 			}
 
 			cpu.write_register(instruction.rd, cpu.read_pc() + 4);
@@ -329,7 +378,7 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			auto target{ cpu.read_register(instruction.rs1) + instruction.imm };
 			target &= ~(std::uint32_t{ 1 });
 			if (target % 4 != 0) {
-				throw std::runtime_error("error: misaligned target for jalr");
+				throw Trap{ TrapCause::InstructionAddressMisaligned };
 			}
 
 			cpu.write_register(instruction.rd, cpu.read_pc() + 4);
@@ -352,7 +401,7 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 		}
 
 		case Operation::Unknown: {
-			throw std::runtime_error("error: unknown operation");
+			throw Trap{ TrapCause::IllegalInstruction };
 			break;
 		}
 

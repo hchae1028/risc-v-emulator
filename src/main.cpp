@@ -43,6 +43,48 @@ int main(int argc, char** argv) {
 					std::cout << "environment call\n";
 					break;
 				}
+
+				case TrapCause::IllegalInstruction: {
+					std::cout << "illegal instruction\n";
+					rc = EXIT_FAILURE;
+					break;
+				}
+
+				case TrapCause::InstructionAddressMisaligned: {
+					std::cout << "instruction address misaligned\n";
+					rc = EXIT_FAILURE;
+					break;
+				}
+
+				case TrapCause::LoadAddressMisaligned: {
+					std::cout << "load address misaligned\n";
+					rc = EXIT_FAILURE;
+					break;
+				}
+
+				case TrapCause::StoreAddressMisaligned: {
+					std::cout << "store address misaligned\n";
+					rc = EXIT_FAILURE;
+					break;
+				}
+
+				case TrapCause::InstructionAccessFault: {
+					std::cout << "instruction access fault\n";
+					rc = EXIT_FAILURE;
+					break;
+				}
+
+				case TrapCause::LoadAccessFault: {
+					std::cout << "load access fault\n";
+					rc = EXIT_FAILURE;
+					break;
+				}
+
+				case TrapCause::StoreAccessFault: {
+					std::cout << "store access fault\n";
+					rc = EXIT_FAILURE;
+					break;
+				}
 			}
 		}
 		else {

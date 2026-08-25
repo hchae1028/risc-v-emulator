@@ -2,6 +2,7 @@
 #include <stdexcept>
 #include <cassert>
 #include "cpu.hpp"
+#include "executor.hpp"
 #include "memory.hpp"
 
 int main() {
@@ -44,8 +45,9 @@ int main() {
 	cpu2.set_pc(64);
 	try {
 		cpu2.fetch_instruction(memory2);
-	} catch (const std::out_of_range& e) {
+	} catch (const Trap& trap) {
 		exception_thrown = true;
+		assert(trap.cause == TrapCause::InstructionAccessFault);
 	}
 	assert(exception_thrown);
 
@@ -54,8 +56,9 @@ int main() {
 	cpu2.set_pc(2);
 	try {
 		cpu2.fetch_instruction(memory2);
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		exception_thrown = true;
+		assert(trap.cause == TrapCause::InstructionAddressMisaligned);
 	}
 	assert(exception_thrown);
 

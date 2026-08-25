@@ -70,15 +70,18 @@ int main() {
 	// PC remains unchanged
 	assert(cpu.read_pc() == 0);
 
-	// Unknown instruction
-	bool exception_thrown{ false };
+	// Unknown instruction produces an illegal-instruction trap
+	bool illegal_trap_thrown{ false };
+	TrapCause illegal_trap_cause{ TrapCause::BreakPoint };
 	instr = decode_instruction(0xFFFFFFFF);
 	try {
 		execute_instruction(cpu, instr, memory);
-	} catch (const std::runtime_error& e) {
-		exception_thrown = true;
+	} catch (const Trap& trap) {
+		illegal_trap_thrown = true;
+		illegal_trap_cause = trap.cause;
 	}
-	assert(exception_thrown);
+	assert(illegal_trap_thrown);
+	assert(illegal_trap_cause == TrapCause::IllegalInstruction);
 	assert(cpu.read_register(1) == 0xFFFFFFFF);
 	assert(cpu.read_register(2) == 1);
 	assert(cpu.read_register(3) == 0);
@@ -595,8 +598,9 @@ int main() {
 	bool load_exception_thrown{ false };
 	try {
 		execute_instruction(load_cpu, instr, load_memory);
-	} catch (const std::out_of_range& e) {
+	} catch (const Trap& trap) {
 		load_exception_thrown = true;
+		assert(trap.cause == TrapCause::LoadAccessFault);
 	}
 	assert(load_exception_thrown);
 	assert(load_cpu.read_register(0) == 0);
@@ -608,8 +612,9 @@ int main() {
 	load_exception_thrown = false;
 	try {
 		execute_instruction(load_cpu, instr, load_memory);
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		load_exception_thrown = true;
+		assert(trap.cause == TrapCause::LoadAddressMisaligned);
 	}
 	assert(load_exception_thrown);
 	assert(load_cpu.read_register(1) == 17);
@@ -621,8 +626,9 @@ int main() {
 	load_exception_thrown = false;
 	try {
 		execute_instruction(load_cpu, instr, load_memory);
-	} catch (const std::out_of_range& e) {
+	} catch (const Trap& trap) {
 		load_exception_thrown = true;
+		assert(trap.cause == TrapCause::LoadAccessFault);
 	}
 	assert(load_exception_thrown);
 	assert(load_cpu.read_register(3) == 0xCAFEBABEu);
@@ -691,8 +697,9 @@ int main() {
 	bool store_exception_thrown{ false };
 	try {
 		execute_instruction(store_cpu, instr, store_memory);
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		store_exception_thrown = true;
+		assert(trap.cause == TrapCause::StoreAddressMisaligned);
 	}
 	assert(store_exception_thrown);
 	for (std::size_t i = 0; i < memory_before_store_error.size(); i++) {
@@ -708,8 +715,9 @@ int main() {
 	store_exception_thrown = false;
 	try {
 		execute_instruction(store_cpu, instr, store_memory);
-	} catch (const std::out_of_range& e) {
+	} catch (const Trap& trap) {
 		store_exception_thrown = true;
+		assert(trap.cause == TrapCause::StoreAccessFault);
 	}
 	assert(store_exception_thrown);
 	for (std::size_t i = 0; i < memory_before_store_error.size(); i++) {
@@ -783,12 +791,26 @@ int main() {
 	bool byte_load_exception_thrown{ false };
 	try {
 		execute_instruction(byte_load_cpu, instr, byte_load_memory);
-	} catch (const std::out_of_range& e) {
+	} catch (const Trap& trap) {
 		byte_load_exception_thrown = true;
+		assert(trap.cause == TrapCause::LoadAccessFault);
 	}
 	assert(byte_load_exception_thrown);
 	assert(byte_load_cpu.read_register(0) == 0);
 	assert(byte_load_memory.read8(17) == 0x81u);
+
+	// LBU reports the same access fault and preserves its destination
+	byte_load_cpu.write_register(4, 0xCAFEBABEu);
+	instr = decode_instruction(0x0000C203); // LBU x4, 0(x1)
+	byte_load_exception_thrown = false;
+	try {
+		execute_instruction(byte_load_cpu, instr, byte_load_memory);
+	} catch (const Trap& trap) {
+		byte_load_exception_thrown = true;
+		assert(trap.cause == TrapCause::LoadAccessFault);
+	}
+	assert(byte_load_exception_thrown);
+	assert(byte_load_cpu.read_register(4) == 0xCAFEBABEu);
 
 	// Direct execution does not change the PC
 	assert(byte_load_cpu.read_pc() == 0);
@@ -859,8 +881,9 @@ int main() {
 	bool byte_store_exception_thrown{ false };
 	try {
 		execute_instruction(byte_store_cpu, instr, byte_store_memory);
-	} catch (const std::out_of_range& e) {
+	} catch (const Trap& trap) {
 		byte_store_exception_thrown = true;
+		assert(trap.cause == TrapCause::StoreAccessFault);
 	}
 	assert(byte_store_exception_thrown);
 	for (std::size_t i = 0; i < memory_before_byte_store_error.size(); i++) {
@@ -935,8 +958,9 @@ int main() {
 	bool halfword_load_exception_thrown{ false };
 	try {
 		execute_instruction(halfword_load_cpu, instr, halfword_load_memory);
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		halfword_load_exception_thrown = true;
+		assert(trap.cause == TrapCause::LoadAddressMisaligned);
 	}
 	assert(halfword_load_exception_thrown);
 	assert(halfword_load_cpu.read_register(0) == 0);
@@ -948,12 +972,26 @@ int main() {
 	halfword_load_exception_thrown = false;
 	try {
 		execute_instruction(halfword_load_cpu, instr, halfword_load_memory);
-	} catch (const std::out_of_range& e) {
+	} catch (const Trap& trap) {
 		halfword_load_exception_thrown = true;
+		assert(trap.cause == TrapCause::LoadAccessFault);
 	}
 	assert(halfword_load_exception_thrown);
 	assert(halfword_load_cpu.read_register(3) == 0xCAFEBABEu);
 	assert(halfword_load_memory.read16(18) == 0x8001u);
+
+	// LHU reports the same access fault and preserves its destination
+	halfword_load_cpu.write_register(4, 0xDEADBEEFu);
+	instr = decode_instruction(0x0000D203); // LHU x4, 0(x1)
+	halfword_load_exception_thrown = false;
+	try {
+		execute_instruction(halfword_load_cpu, instr, halfword_load_memory);
+	} catch (const Trap& trap) {
+		halfword_load_exception_thrown = true;
+		assert(trap.cause == TrapCause::LoadAccessFault);
+	}
+	assert(halfword_load_exception_thrown);
+	assert(halfword_load_cpu.read_register(4) == 0xDEADBEEFu);
 
 	// Direct execution does not change the PC
 	assert(halfword_load_cpu.read_pc() == 0);
@@ -1027,8 +1065,9 @@ int main() {
 	bool halfword_store_exception_thrown{ false };
 	try {
 		execute_instruction(halfword_store_cpu, instr, halfword_store_memory);
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		halfword_store_exception_thrown = true;
+		assert(trap.cause == TrapCause::StoreAddressMisaligned);
 	}
 	assert(halfword_store_exception_thrown);
 	for (std::size_t i = 0; i < memory_before_halfword_store_error.size(); i++) {
@@ -1044,8 +1083,9 @@ int main() {
 	halfword_store_exception_thrown = false;
 	try {
 		execute_instruction(halfword_store_cpu, instr, halfword_store_memory);
-	} catch (const std::out_of_range& e) {
+	} catch (const Trap& trap) {
 		halfword_store_exception_thrown = true;
+		assert(trap.cause == TrapCause::StoreAccessFault);
 	}
 	assert(halfword_store_exception_thrown);
 	for (std::size_t i = 0; i < memory_before_halfword_store_error.size(); i++) {
@@ -1111,8 +1151,9 @@ int main() {
 	bool branch_exception_thrown{ false };
 	try {
 		static_cast<void>(execute_instruction(branch_cpu, instr, branch_memory));
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		branch_exception_thrown = true;
+		assert(trap.cause == TrapCause::InstructionAddressMisaligned);
 	}
 	assert(branch_exception_thrown);
 	assert(branch_cpu.read_pc() == 0);
@@ -1128,8 +1169,9 @@ int main() {
 	branch_exception_thrown = false;
 	try {
 		static_cast<void>(execute_instruction(branch_cpu, instr, branch_memory));
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		branch_exception_thrown = true;
+		assert(trap.cause == TrapCause::InstructionAddressMisaligned);
 	}
 	assert(branch_exception_thrown);
 	assert(branch_cpu.read_pc() == 0);
@@ -1195,8 +1237,9 @@ int main() {
 	bool signed_branch_exception_thrown{ false };
 	try {
 		static_cast<void>(execute_instruction(signed_branch_cpu, instr, signed_branch_memory));
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		signed_branch_exception_thrown = true;
+		assert(trap.cause == TrapCause::InstructionAddressMisaligned);
 	}
 	assert(signed_branch_exception_thrown);
 	assert(signed_branch_cpu.read_pc() == 0);
@@ -1216,8 +1259,9 @@ int main() {
 	signed_branch_exception_thrown = false;
 	try {
 		static_cast<void>(execute_instruction(signed_branch_cpu, instr, signed_branch_memory));
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		signed_branch_exception_thrown = true;
+		assert(trap.cause == TrapCause::InstructionAddressMisaligned);
 	}
 	assert(signed_branch_exception_thrown);
 	assert(signed_branch_cpu.read_pc() == 0);
@@ -1280,8 +1324,9 @@ int main() {
 	bool unsigned_branch_exception_thrown{ false };
 	try {
 		static_cast<void>(execute_instruction(unsigned_branch_cpu, instr, unsigned_branch_memory));
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		unsigned_branch_exception_thrown = true;
+		assert(trap.cause == TrapCause::InstructionAddressMisaligned);
 	}
 	assert(unsigned_branch_exception_thrown);
 	assert(unsigned_branch_cpu.read_pc() == 0);
@@ -1301,8 +1346,9 @@ int main() {
 	unsigned_branch_exception_thrown = false;
 	try {
 		static_cast<void>(execute_instruction(unsigned_branch_cpu, instr, unsigned_branch_memory));
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		unsigned_branch_exception_thrown = true;
+		assert(trap.cause == TrapCause::InstructionAddressMisaligned);
 	}
 	assert(unsigned_branch_exception_thrown);
 	assert(unsigned_branch_cpu.read_pc() == 0);
@@ -1449,8 +1495,9 @@ int main() {
 	bool jal_exception_thrown{ false };
 	try {
 		static_cast<void>(execute_instruction(jal_cpu, instr, jal_memory));
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		jal_exception_thrown = true;
+		assert(trap.cause == TrapCause::InstructionAddressMisaligned);
 	}
 	assert(jal_exception_thrown);
 	assert(jal_cpu.read_pc() == 100);
@@ -1544,8 +1591,9 @@ int main() {
 	bool jalr_exception_thrown{ false };
 	try {
 		static_cast<void>(execute_instruction(jalr_cpu, instr, jalr_memory));
-	} catch (const std::runtime_error& e) {
+	} catch (const Trap& trap) {
 		jalr_exception_thrown = true;
+		assert(trap.cause == TrapCause::InstructionAddressMisaligned);
 	}
 	assert(jalr_exception_thrown);
 	assert(jalr_cpu.read_pc() == 100);
@@ -1638,15 +1686,18 @@ int main() {
 	assert(trap_memory.read32(0) == 0xA5A5A5A5u);
 	assert(trap_memory.read32(4) == 0x5A5A5A5Au);
 
-	// A reserved SYSTEM encoding is an emulator error, not a guest trap
+	// A reserved SYSTEM encoding produces an illegal-instruction trap
 	instr = decode_instruction(0x00200073);
-	bool reserved_system_exception_thrown{ false };
+	trap_thrown = false;
+	trap_cause = TrapCause::EnvironmentCall;
 	try {
 		static_cast<void>(execute_instruction(trap_cpu, instr, trap_memory));
-	} catch (const std::runtime_error& e) {
-		reserved_system_exception_thrown = true;
+	} catch (const Trap& trap) {
+		trap_thrown = true;
+		trap_cause = trap.cause;
 	}
-	assert(reserved_system_exception_thrown);
+	assert(trap_thrown);
+	assert(trap_cause == TrapCause::IllegalInstruction);
 	assert(trap_cpu.read_pc() == 100);
 	assert(trap_cpu.read_register(1) == 0xDEADBEEFu);
 	assert(trap_cpu.read_register(2) == 0xCAFEBABEu);
