@@ -199,3 +199,39 @@ void load_elf_segments(Memory& memory, std::span<const std::uint8_t> bytes, std:
 		}
 	}
 }
+
+std::uint32_t load_elf32(Memory& memory, std::span<const std::uint8_t> bytes) {
+	auto header{ parse_elf32_header(bytes) };
+	auto segments{ parse_elf32_load_segments(bytes, header) };
+
+	if (segments.empty()) {
+		throw std::runtime_error("error: ELF has no PT_LOAD segments");
+	}
+
+	bool valid_entry{ false };
+	auto entry{ static_cast<std::uint64_t>(header.entry) };
+
+	for (const auto& segment: segments) {
+		// PF_X flag check
+		if ((segment.flags & 0x1u) == 0) {
+			continue;
+		}
+		
+		auto start{ static_cast<std::uint64_t>(segment.vaddr) };
+		auto end{ start + static_cast<std::uint64_t>(segment.memsz) };
+
+		if (entry >= start && entry < end) {
+			valid_entry = true;
+			break;
+		}
+	}
+
+	if (!valid_entry) {
+		throw std::runtime_error("error: ELF entry point is not inside an executable segment");
+	}
+
+	load_elf_segments(memory, bytes, segments);
+
+	return header.entry;
+}
+

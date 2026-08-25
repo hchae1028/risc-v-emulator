@@ -35,6 +35,7 @@ add_executable(step_test)
 add_executable(program_loader_test)
 add_executable(runner_test)
 add_executable(elf_loader_test)
+add_executable(elf_execution_test)
 
 target_sources(risc-v-emulator
 	PRIVATE
@@ -84,6 +85,11 @@ target_sources(runner_test
 target_sources(elf_loader_test
 	PRIVATE
 		tests/elf_loader_test.cpp
+)
+
+target_sources(elf_execution_test
+	PRIVATE
+		tests/elf_execution_test.cpp
 )
 
 target_include_directories(riscv_core
@@ -146,6 +152,11 @@ target_link_libraries(elf_loader_test
 		riscv_core
 )
 
+target_link_libraries(elf_execution_test
+	PRIVATE
+		riscv_core
+)
+
 enable_project_warnings(riscv_core)
 enable_project_warnings(risc-v-emulator)
 enable_project_warnings(cpu_test)
@@ -157,6 +168,7 @@ enable_project_warnings(step_test)
 enable_project_warnings(program_loader_test)
 enable_project_warnings(runner_test)
 enable_project_warnings(elf_loader_test)
+enable_project_warnings(elf_execution_test)
 
 add_test(
 	NAME cpu_test
@@ -202,3 +214,55 @@ add_test(
 	NAME elf_loader_test
 	COMMAND elf_loader_test
 )
+
+add_test(
+	NAME elf_execution_test
+	COMMAND elf_execution_test
+)
+
+find_program(RISCV_GCC riscv64-elf-gcc)
+
+if(RISCV_GCC)
+	set(EXAMPLE_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/examples)
+	set(ADD_C_ELF ${EXAMPLE_OUTPUT_DIR}/add_c.elf)
+
+	add_custom_command(
+		OUTPUT ${ADD_C_ELF}
+		COMMAND ${CMAKE_COMMAND} -E make_directory ${EXAMPLE_OUTPUT_DIR}
+		COMMAND ${RISCV_GCC}
+			-march=rv32i
+			-mabi=ilp32
+			-ffreestanding
+			-nostdlib
+			-nostartfiles
+			-fno-pic
+			-fno-pie
+			-O0
+			-Wl,--build-id=none
+			-T ${CMAKE_CURRENT_SOURCE_DIR}/examples/linker.ld
+			${CMAKE_CURRENT_SOURCE_DIR}/examples/add_start.S
+			${CMAKE_CURRENT_SOURCE_DIR}/examples/add.c
+			-o ${ADD_C_ELF}
+		DEPENDS
+			${CMAKE_CURRENT_SOURCE_DIR}/examples/linker.ld
+			${CMAKE_CURRENT_SOURCE_DIR}/examples/add_start.S
+			${CMAKE_CURRENT_SOURCE_DIR}/examples/add.c
+		VERBATIM
+	)
+
+	add_custom_target(add_c_example ALL
+		DEPENDS ${ADD_C_ELF}
+	)
+
+	add_test(
+		NAME add_c_example_test
+		COMMAND ${CMAKE_COMMAND}
+			-DEMULATOR=$<TARGET_FILE:risc-v-emulator>
+			-DGUEST_ELF=${ADD_C_ELF}
+			-P ${CMAKE_CURRENT_SOURCE_DIR}/tests/add_c_example_test.cmake
+	)
+
+	message(STATUS "RISC-V cross-compiler found: ${RISCV_GCC}")
+else()
+	message(STATUS "riscv64-elf-gcc not found; guest ELF build disabled")
+endif()

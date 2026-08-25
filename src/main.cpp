@@ -1,4 +1,3 @@
-#include <algorithm>
 #include <cstddef>
 #include <exception>
 #include <ios>
@@ -9,23 +8,25 @@
 #include "cpu.hpp"
 #include "memory.hpp"
 #include "program_loader.hpp"
+#include "elf_loader.hpp"
 #include "runner.hpp"
 
 int main(int argc, char** argv) {
 	if (argc != 2) {
-		std::cerr << "usage: risc-v-emulator <program.bin>\n";
+		std::cerr << "usage: risc-v-emulator <program.elf>\n";
 		return EXIT_FAILURE;
 	}
 
 	try {	
-		Cpu cpu{};
 
 		auto bytes{ read_binary_file(std::filesystem::path{ argv[1] }) };
-		constexpr std::size_t min_memory_size{ 64 * 1024 };
-		auto memory_size{ std::max(min_memory_size, bytes.size()) };
+		constexpr std::size_t memory_size{ 64 * 1024 };
 
 		Memory memory{ memory_size };
-		memory.load_bytes(0, bytes);
+		auto entry{ load_elf32(memory, bytes) };
+
+		Cpu cpu{};
+		cpu.set_pc(entry);
 
 		auto result{ run_until_trap(cpu, memory, 1'000'000) };
 		auto rc{ EXIT_SUCCESS };

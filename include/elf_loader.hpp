@@ -31,4 +31,6 @@ std::vector<Elf32LoadSegment> parse_elf32_load_segments(std::span<const std::uin
 
 void load_elf_segments(Memory& memory, std::span<const std::uint8_t> bytes, std::span<const Elf32LoadSegment> segments);
 
+std::uint32_t load_elf32(Memory& memory, std::span<const std::uint8_t> bytes);
+
 #endif

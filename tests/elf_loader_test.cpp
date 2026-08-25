@@ -87,6 +87,16 @@ void assert_load_rejected(Memory& memory, const std::vector<std::uint8_t>& bytes
 	assert(exception_thrown);
 }
 
+void assert_elf_load_rejected(Memory& memory, const std::vector<std::uint8_t>& bytes) {
+	bool exception_thrown{ false };
+	try {
+		static_cast<void>(load_elf32(memory, bytes));
+	} catch (const std::runtime_error& e) {
+		exception_thrown = true;
+	}
+	assert(exception_thrown);
+}
+
 }
 
 int main() {
@@ -471,6 +481,85 @@ int main() {
 	fill_memory(separate_address_memory, 0xA5u);
 	assert_load_rejected(separate_address_memory, adjacent_bytes, separate_address_segments);
 	assert_memory_filled(separate_address_memory, 0xA5u);
+
+	/* Complete ELF loading accepts an entry at the start of an executable segment */
+	auto complete_elf{ make_valid_elf() };
+	complete_elf.resize(88);
+	write32(complete_elf, 24, 4);
+	complete_elf[84] = 0x11u;
+	complete_elf[85] = 0x22u;
+	complete_elf[86] = 0x33u;
+	complete_elf[87] = 0x44u;
+	write_program_header(complete_elf, 52, 1, 84, 4, 4, 4, 8, 0x5u, 4);
+
+	Memory complete_memory{ 12 };
+	fill_memory(complete_memory, 0xA5u);
+	const auto loaded_entry{ load_elf32(complete_memory, complete_elf) };
+	assert(loaded_entry == 4);
+	assert(complete_memory.read8(4) == 0x11u);
+	assert(complete_memory.read8(5) == 0x22u);
+	assert(complete_memory.read8(6) == 0x33u);
+	assert(complete_memory.read8(7) == 0x44u);
+	for (std::uint32_t address{ 8 }; address < 12; address++) {
+		assert(complete_memory.read8(address) == 0);
+	}
+
+	/* Entry validation uses the memory image, including its zero-filled tail */
+	auto zero_tail_entry_elf{ complete_elf };
+	write32(zero_tail_entry_elf, 24, 8);
+	Memory zero_tail_entry_memory{ 12 };
+	fill_memory(zero_tail_entry_memory, 0xA5u);
+	assert(load_elf32(zero_tail_entry_memory, zero_tail_entry_elf) == 8);
+	assert(zero_tail_entry_memory.read8(8) == 0);
+
+	/* The exclusive end of an executable segment is not a valid entry point */
+	auto end_entry_elf{ complete_elf };
+	write32(end_entry_elf, 24, 12);
+	Memory end_entry_memory{ 12 };
+	fill_memory(end_entry_memory, 0xA5u);
+	assert_elf_load_rejected(end_entry_memory, end_entry_elf);
+	assert_memory_filled(end_entry_memory, 0xA5u);
+
+	/* An entry inside a non-executable segment is rejected without modifying memory */
+	auto non_executable_entry_elf{ complete_elf };
+	write_program_header(non_executable_entry_elf, 52, 1, 84, 4, 4, 4, 8, 0x6u, 4);
+	Memory non_executable_entry_memory{ 12 };
+	fill_memory(non_executable_entry_memory, 0xA5u);
+	assert_elf_load_rejected(non_executable_entry_memory, non_executable_entry_elf);
+	assert_memory_filled(non_executable_entry_memory, 0xA5u);
+
+	/* The entry may select one executable segment while every PT_LOAD is loaded */
+	auto multiple_segment_elf{ make_valid_elf() };
+	multiple_segment_elf.resize(124);
+	write16(multiple_segment_elf, 44, 2);
+	write32(multiple_segment_elf, 24, 16);
+	multiple_segment_elf[116] = 0x10u;
+	multiple_segment_elf[117] = 0x20u;
+	multiple_segment_elf[118] = 0x30u;
+	multiple_segment_elf[119] = 0x40u;
+	multiple_segment_elf[120] = 0x50u;
+	multiple_segment_elf[121] = 0x60u;
+	multiple_segment_elf[122] = 0x70u;
+	multiple_segment_elf[123] = 0x80u;
+	write_program_header(multiple_segment_elf, 52, 1, 116, 4, 4, 4, 4, 0x6u, 4);
+	write_program_header(multiple_segment_elf, 84, 1, 120, 16, 16, 4, 8, 0x5u, 4);
+
+	Memory multiple_segment_memory{ 24 };
+	fill_memory(multiple_segment_memory, 0xA5u);
+	assert(load_elf32(multiple_segment_memory, multiple_segment_elf) == 16);
+	assert(multiple_segment_memory.read8(4) == 0x10u);
+	assert(multiple_segment_memory.read8(7) == 0x40u);
+	assert(multiple_segment_memory.read8(16) == 0x50u);
+	assert(multiple_segment_memory.read8(19) == 0x80u);
+	assert(multiple_segment_memory.read8(20) == 0);
+	assert(multiple_segment_memory.read8(23) == 0);
+
+	/* An executable with no PT_LOAD entries is rejected without modifying memory */
+	const auto no_load_segments_elf{ make_valid_elf() };
+	Memory no_load_segments_memory{ 12 };
+	fill_memory(no_load_segments_memory, 0xA5u);
+	assert_elf_load_rejected(no_load_segments_memory, no_load_segments_elf);
+	assert_memory_filled(no_load_segments_memory, 0xA5u);
 
 	return 0;
 }
