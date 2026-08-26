@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <stdexcept>
 #include <cassert>
+#include "bus.hpp"
 #include "cpu.hpp"
 #include "executor.hpp"
 #include "memory.hpp"
@@ -11,14 +12,15 @@ int main() {
 	/* fetch_instruction() tests */
 	Cpu cpu2{};
 	Memory memory2{ 64 };
+	Bus bus2{ memory2, 0 };
 
 	// Fetch an instruction when PC = 0
-	assert(cpu2.fetch_instruction(memory2) == 0);
+	assert(cpu2.fetch_instruction(bus2) == 0);
 
 	// Instruction when PC = 4
 	cpu2.set_pc(4);
 	memory2.write32(4, 0x11111111);
-	assert(cpu2.fetch_instruction(memory2) == 0x11111111);
+	assert(cpu2.fetch_instruction(bus2) == 0x11111111);
 	assert(cpu2.read_pc() == 4);
 
 	// Register values unchanged
@@ -38,13 +40,13 @@ int main() {
 	// Fetch the instruction at the highest valid PC
 	cpu2.set_pc(60);
 	memory2.write32(60, 0xFFFFFFFF);
-	assert(cpu2.fetch_instruction(memory2) == 0xFFFFFFFF);
+	assert(cpu2.fetch_instruction(bus2) == 0xFFFFFFFF);
 	assert(memory2.read32(60) == 0xFFFFFFFF);
 	
 	// Aligned but out-of-range PC
 	cpu2.set_pc(64);
 	try {
-		cpu2.fetch_instruction(memory2);
+		cpu2.fetch_instruction(bus2);
 	} catch (const Trap& trap) {
 		exception_thrown = true;
 		assert(trap.cause == TrapCause::InstructionAccessFault);
@@ -55,7 +57,7 @@ int main() {
 	exception_thrown = false;
 	cpu2.set_pc(2);
 	try {
-		cpu2.fetch_instruction(memory2);
+		cpu2.fetch_instruction(bus2);
 	} catch (const Trap& trap) {
 		exception_thrown = true;
 		assert(trap.cause == TrapCause::InstructionAddressMisaligned);

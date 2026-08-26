@@ -1,3 +1,4 @@
+#include "bus.hpp"
 #include "cpu.hpp"
 #include "decoder.hpp"
 #include "executor.hpp"
@@ -8,6 +9,15 @@
 #include <cstdint>
 #include <stdexcept>
 
+namespace {
+
+void step_with_ram(Cpu& cpu, Memory& ram) {
+	Bus bus{ ram, 0 };
+	cpu.step(bus);
+}
+
+}
+
 int main() {
 	Cpu cpu{};
 	Memory memory{ 64 };
@@ -16,19 +26,19 @@ int main() {
 	memory.write32(4, 0x00700113);	// ADDI x2, x0, 7
 	memory.write32(8, 0x002081B3);	// ADD x3, x1, x2
 	
-	cpu.step(memory);
+	step_with_ram(cpu, memory);
 	assert(cpu.read_pc() == 4);
 	assert(cpu.read_register(1) == 5);
 	assert(cpu.read_register(2) == 0);
 	assert(cpu.read_register(3) == 0);
 
-	cpu.step(memory);
+	step_with_ram(cpu, memory);
 	assert(cpu.read_pc() == 8);
 	assert(cpu.read_register(1) == 5);
 	assert(cpu.read_register(2) == 7);
 	assert(cpu.read_register(3) == 0);
 
-	cpu.step(memory);
+	step_with_ram(cpu, memory);
 	assert(cpu.read_pc() == 12);
 	assert(cpu.read_register(3) == 12);
 
@@ -46,7 +56,7 @@ int main() {
 	bool illegal_trap_thrown{ false };
 	TrapCause illegal_trap_cause{ TrapCause::BreakPoint };
 	try {
-		cpu.step(memory);
+		step_with_ram(cpu, memory);
 	} catch (const Trap& trap) {
 		illegal_trap_thrown = true;
 		illegal_trap_cause = trap.cause;
@@ -62,7 +72,7 @@ int main() {
 	cpu.set_pc(64);
 	bool exception_thrown{ false };
 	try {
-		cpu.step(memory);
+		step_with_ram(cpu, memory);
 	} catch (const Trap& trap) {
 		exception_thrown = true;
 		assert(trap.cause == TrapCause::InstructionAccessFault);
@@ -83,15 +93,15 @@ int main() {
 	bitwise_memory.write32(4, 0x0020E233); // OR x4, x1, x2
 	bitwise_memory.write32(8, 0x0020F2B3); // AND x5, x1, x2
 
-	bitwise_cpu.step(bitwise_memory);
+	step_with_ram(bitwise_cpu, bitwise_memory);
 	assert(bitwise_cpu.read_pc() == 4);
 	assert(bitwise_cpu.read_register(3) == 0xC33C3CC3u);
 
-	bitwise_cpu.step(bitwise_memory);
+	step_with_ram(bitwise_cpu, bitwise_memory);
 	assert(bitwise_cpu.read_pc() == 8);
 	assert(bitwise_cpu.read_register(4) == 0xCF3FFCF3u);
 
-	bitwise_cpu.step(bitwise_memory);
+	step_with_ram(bitwise_cpu, bitwise_memory);
 	assert(bitwise_cpu.read_pc() == 12);
 	assert(bitwise_cpu.read_register(5) == 0x0C03C030u);
 	assert(bitwise_cpu.read_register(1) == 0xCC33CC33u);
@@ -106,15 +116,15 @@ int main() {
 	immediate_bitwise_memory.write32(4, 0x0F00E213); // ORI x4, x1, 0xF0
 	immediate_bitwise_memory.write32(8, 0xF000F293); // ANDI x5, x1, -256
 
-	immediate_bitwise_cpu.step(immediate_bitwise_memory);
+	step_with_ram(immediate_bitwise_cpu, immediate_bitwise_memory);
 	assert(immediate_bitwise_cpu.read_pc() == 4);
 	assert(immediate_bitwise_cpu.read_register(3) == 0x33CC33CCu);
 
-	immediate_bitwise_cpu.step(immediate_bitwise_memory);
+	step_with_ram(immediate_bitwise_cpu, immediate_bitwise_memory);
 	assert(immediate_bitwise_cpu.read_pc() == 8);
 	assert(immediate_bitwise_cpu.read_register(4) == 0xCC33CCF3u);
 
-	immediate_bitwise_cpu.step(immediate_bitwise_memory);
+	step_with_ram(immediate_bitwise_cpu, immediate_bitwise_memory);
 	assert(immediate_bitwise_cpu.read_pc() == 12);
 	assert(immediate_bitwise_cpu.read_register(5) == 0xCC33CC00u);
 	assert(immediate_bitwise_cpu.read_register(1) == 0xCC33CC33u);
@@ -129,15 +139,15 @@ int main() {
 	shift_memory.write32(4, 0x0020D233); // SRL x4, x1, x2
 	shift_memory.write32(8, 0x4020D2B3); // SRA x5, x1, x2
 
-	shift_cpu.step(shift_memory);
+	step_with_ram(shift_cpu, shift_memory);
 	assert(shift_cpu.read_pc() == 4);
 	assert(shift_cpu.read_register(3) == 0x00000010u);
 
-	shift_cpu.step(shift_memory);
+	step_with_ram(shift_cpu, shift_memory);
 	assert(shift_cpu.read_pc() == 8);
 	assert(shift_cpu.read_register(4) == 0x08000000u);
 
-	shift_cpu.step(shift_memory);
+	step_with_ram(shift_cpu, shift_memory);
 	assert(shift_cpu.read_pc() == 12);
 	assert(shift_cpu.read_register(5) == 0xF8000000u);
 	assert(shift_cpu.read_register(1) == 0x80000001u);
@@ -152,15 +162,15 @@ int main() {
 	immediate_shift_memory.write32(4, 0x0040D213); // SRLI x4, x1, 4
 	immediate_shift_memory.write32(8, 0x4040D293); // SRAI x5, x1, 4
 
-	immediate_shift_cpu.step(immediate_shift_memory);
+	step_with_ram(immediate_shift_cpu, immediate_shift_memory);
 	assert(immediate_shift_cpu.read_pc() == 4);
 	assert(immediate_shift_cpu.read_register(3) == 0x00000010u);
 
-	immediate_shift_cpu.step(immediate_shift_memory);
+	step_with_ram(immediate_shift_cpu, immediate_shift_memory);
 	assert(immediate_shift_cpu.read_pc() == 8);
 	assert(immediate_shift_cpu.read_register(4) == 0x08000000u);
 
-	immediate_shift_cpu.step(immediate_shift_memory);
+	step_with_ram(immediate_shift_cpu, immediate_shift_memory);
 	assert(immediate_shift_cpu.read_pc() == 12);
 	assert(immediate_shift_cpu.read_register(5) == 0xF8000000u);
 	assert(immediate_shift_cpu.read_register(1) == 0x80000001u);
@@ -174,11 +184,11 @@ int main() {
 	comparison_memory.write32(0, 0x0020A1B3); // SLT x3, x1, x2
 	comparison_memory.write32(4, 0x0020B233); // SLTU x4, x1, x2
 
-	comparison_cpu.step(comparison_memory);
+	step_with_ram(comparison_cpu, comparison_memory);
 	assert(comparison_cpu.read_pc() == 4);
 	assert(comparison_cpu.read_register(3) == 1);
 
-	comparison_cpu.step(comparison_memory);
+	step_with_ram(comparison_cpu, comparison_memory);
 	assert(comparison_cpu.read_pc() == 8);
 	assert(comparison_cpu.read_register(4) == 0);
 	assert(comparison_cpu.read_register(1) == 0xFFFFFFFFu);
@@ -192,11 +202,11 @@ int main() {
 	immediate_comparison_memory.write32(0, 0xFFF0A193); // SLTI x3, x1, -1
 	immediate_comparison_memory.write32(4, 0xFFF0B213); // SLTIU x4, x1, -1
 
-	immediate_comparison_cpu.step(immediate_comparison_memory);
+	step_with_ram(immediate_comparison_cpu, immediate_comparison_memory);
 	assert(immediate_comparison_cpu.read_pc() == 4);
 	assert(immediate_comparison_cpu.read_register(3) == 0);
 
-	immediate_comparison_cpu.step(immediate_comparison_memory);
+	step_with_ram(immediate_comparison_cpu, immediate_comparison_memory);
 	assert(immediate_comparison_cpu.read_pc() == 8);
 	assert(immediate_comparison_cpu.read_register(4) == 1);
 	assert(immediate_comparison_cpu.read_register(1) == 0);
@@ -211,12 +221,12 @@ int main() {
 	load_memory.write32(20, 0x89ABCDEFu);
 	load_memory.write32(32, 0x12345678u);
 
-	load_cpu.step(load_memory);
+	step_with_ram(load_cpu, load_memory);
 	assert(load_cpu.read_pc() == 4);
 	assert(load_cpu.read_register(3) == 0x12345678u);
 	assert(load_cpu.read_register(4) == 0);
 
-	load_cpu.step(load_memory);
+	step_with_ram(load_cpu, load_memory);
 	assert(load_cpu.read_pc() == 8);
 	assert(load_cpu.read_register(4) == 0x89ABCDEFu);
 	assert(load_cpu.read_register(1) == 24);
@@ -233,7 +243,7 @@ int main() {
 
 	bool load_exception_thrown{ false };
 	try {
-		failed_load_cpu.step(failed_load_memory);
+		step_with_ram(failed_load_cpu, failed_load_memory);
 	} catch (const Trap& trap) {
 		load_exception_thrown = true;
 		assert(trap.cause == TrapCause::LoadAddressMisaligned);
@@ -253,14 +263,14 @@ int main() {
 	store_memory.write32(0, 0x0020A423); // SW x2, 8(x1)
 	store_memory.write32(4, 0xFE30AE23); // SW x3, -4(x1)
 
-	store_cpu.step(store_memory);
+	step_with_ram(store_cpu, store_memory);
 	assert(store_cpu.read_pc() == 4);
 	assert(store_memory.read32(32) == 0x12345678u);
 	assert(store_cpu.read_register(1) == 24);
 	assert(store_cpu.read_register(2) == 0x12345678u);
 	assert(store_cpu.read_register(3) == 0x89ABCDEFu);
 
-	store_cpu.step(store_memory);
+	step_with_ram(store_cpu, store_memory);
 	assert(store_cpu.read_pc() == 8);
 	assert(store_memory.read32(20) == 0x89ABCDEFu);
 	assert(store_memory.read32(0) == 0x0020A423u);
@@ -277,7 +287,7 @@ int main() {
 
 	bool store_exception_thrown{ false };
 	try {
-		failed_store_cpu.step(failed_store_memory);
+		step_with_ram(failed_store_cpu, failed_store_memory);
 	} catch (const Trap& trap) {
 		store_exception_thrown = true;
 		assert(trap.cause == TrapCause::StoreAddressMisaligned);
@@ -295,11 +305,11 @@ int main() {
 	byte_load_memory.write32(4, 0x01104203); // LBU x4, 17(x0)
 	byte_load_memory.write8(17, 0x80u);
 
-	byte_load_cpu.step(byte_load_memory);
+	step_with_ram(byte_load_cpu, byte_load_memory);
 	assert(byte_load_cpu.read_pc() == 4);
 	assert(byte_load_cpu.read_register(3) == 0xFFFFFF80u);
 
-	byte_load_cpu.step(byte_load_memory);
+	step_with_ram(byte_load_cpu, byte_load_memory);
 	assert(byte_load_cpu.read_pc() == 8);
 	assert(byte_load_cpu.read_register(4) == 0x00000080u);
 	assert(byte_load_memory.read8(17) == 0x80u);
@@ -312,7 +322,7 @@ int main() {
 
 	bool byte_load_exception_thrown{ false };
 	try {
-		failed_byte_load_cpu.step(failed_byte_load_memory);
+		step_with_ram(failed_byte_load_cpu, failed_byte_load_memory);
 	} catch (const Trap& trap) {
 		byte_load_exception_thrown = true;
 		assert(trap.cause == TrapCause::LoadAccessFault);
@@ -331,12 +341,12 @@ int main() {
 	byte_store_memory.write32(0, 0x002008A3); // SB x2, 17(x0)
 	byte_store_memory.write32(4, 0x00300923); // SB x3, 18(x0)
 
-	byte_store_cpu.step(byte_store_memory);
+	step_with_ram(byte_store_cpu, byte_store_memory);
 	assert(byte_store_cpu.read_pc() == 4);
 	assert(byte_store_memory.read8(17) == 0x80u);
 	assert(byte_store_cpu.read_register(2) == 0x12345680u);
 
-	byte_store_cpu.step(byte_store_memory);
+	step_with_ram(byte_store_cpu, byte_store_memory);
 	assert(byte_store_cpu.read_pc() == 8);
 	assert(byte_store_memory.read8(18) == 0x7Fu);
 	assert(byte_store_memory.read32(0) == 0x002008A3u);
@@ -352,7 +362,7 @@ int main() {
 
 	bool byte_store_exception_thrown{ false };
 	try {
-		failed_byte_store_cpu.step(failed_byte_store_memory);
+		step_with_ram(failed_byte_store_cpu, failed_byte_store_memory);
 	} catch (const Trap& trap) {
 		byte_store_exception_thrown = true;
 		assert(trap.cause == TrapCause::StoreAccessFault);
@@ -371,11 +381,11 @@ int main() {
 	halfword_load_memory.write32(4, 0x0020D203); // LHU x4, 2(x1)
 	halfword_load_memory.write16(18, 0x8001u);
 
-	halfword_load_cpu.step(halfword_load_memory);
+	step_with_ram(halfword_load_cpu, halfword_load_memory);
 	assert(halfword_load_cpu.read_pc() == 4);
 	assert(halfword_load_cpu.read_register(3) == 0xFFFF8001u);
 
-	halfword_load_cpu.step(halfword_load_memory);
+	step_with_ram(halfword_load_cpu, halfword_load_memory);
 	assert(halfword_load_cpu.read_pc() == 8);
 	assert(halfword_load_cpu.read_register(4) == 0x00008001u);
 	assert(halfword_load_cpu.read_register(1) == 16);
@@ -389,7 +399,7 @@ int main() {
 
 	bool halfword_load_exception_thrown{ false };
 	try {
-		failed_halfword_load_cpu.step(failed_halfword_load_memory);
+		step_with_ram(failed_halfword_load_cpu, failed_halfword_load_memory);
 	} catch (const Trap& trap) {
 		halfword_load_exception_thrown = true;
 		assert(trap.cause == TrapCause::LoadAddressMisaligned);
@@ -408,12 +418,12 @@ int main() {
 	halfword_store_memory.write32(0, 0x00201923); // SH x2, 18(x0)
 	halfword_store_memory.write32(4, 0x00301A23); // SH x3, 20(x0)
 
-	halfword_store_cpu.step(halfword_store_memory);
+	step_with_ram(halfword_store_cpu, halfword_store_memory);
 	assert(halfword_store_cpu.read_pc() == 4);
 	assert(halfword_store_memory.read16(18) == 0x8001u);
 	assert(halfword_store_cpu.read_register(2) == 0x12348001u);
 
-	halfword_store_cpu.step(halfword_store_memory);
+	step_with_ram(halfword_store_cpu, halfword_store_memory);
 	assert(halfword_store_cpu.read_pc() == 8);
 	assert(halfword_store_memory.read16(20) == 0x7FFFu);
 	assert(halfword_store_memory.read32(0) == 0x00201923u);
@@ -429,7 +439,7 @@ int main() {
 
 	bool halfword_store_exception_thrown{ false };
 	try {
-		failed_halfword_store_cpu.step(failed_halfword_store_memory);
+		step_with_ram(failed_halfword_store_cpu, failed_halfword_store_memory);
 	} catch (const Trap& trap) {
 		halfword_store_exception_thrown = true;
 		assert(trap.cause == TrapCause::StoreAddressMisaligned);
@@ -448,10 +458,10 @@ int main() {
 	forward_branch_memory.write32(4, 0x00100193); // ADDI x3, x0, 1 (skipped)
 	forward_branch_memory.write32(8, 0x00200193); // ADDI x3, x0, 2
 
-	forward_branch_cpu.step(forward_branch_memory);
+	step_with_ram(forward_branch_cpu, forward_branch_memory);
 	assert(forward_branch_cpu.read_pc() == 8);
 	assert(forward_branch_cpu.read_register(3) == 0);
-	forward_branch_cpu.step(forward_branch_memory);
+	step_with_ram(forward_branch_cpu, forward_branch_memory);
 	assert(forward_branch_cpu.read_pc() == 12);
 	assert(forward_branch_cpu.read_register(3) == 2);
 	assert(forward_branch_memory.read32(0) == 0x00208463u);
@@ -465,9 +475,9 @@ int main() {
 	backward_branch_memory.write32(4, 0x00700213); // ADDI x4, x0, 7
 	backward_branch_memory.write32(8, 0xFE209EE3); // BNE x1, x2, -4
 
-	backward_branch_cpu.step(backward_branch_memory);
+	step_with_ram(backward_branch_cpu, backward_branch_memory);
 	assert(backward_branch_cpu.read_pc() == 4);
-	backward_branch_cpu.step(backward_branch_memory);
+	step_with_ram(backward_branch_cpu, backward_branch_memory);
 	assert(backward_branch_cpu.read_pc() == 8);
 	assert(backward_branch_cpu.read_register(4) == 7);
 
@@ -477,7 +487,7 @@ int main() {
 	not_taken_branch_cpu.write_register(1, 1);
 	not_taken_branch_cpu.write_register(2, 2);
 	not_taken_branch_memory.write32(0, 0x00208163); // BEQ x1, x2, +2
-	not_taken_branch_cpu.step(not_taken_branch_memory);
+	step_with_ram(not_taken_branch_cpu, not_taken_branch_memory);
 	assert(not_taken_branch_cpu.read_pc() == 4);
 
 	// A taken misaligned target leaves architectural state unchanged
@@ -490,7 +500,7 @@ int main() {
 
 	bool branch_exception_thrown{ false };
 	try {
-		failed_branch_cpu.step(failed_branch_memory);
+		step_with_ram(failed_branch_cpu, failed_branch_memory);
 	} catch (const Trap& trap) {
 		branch_exception_thrown = true;
 		assert(trap.cause == TrapCause::InstructionAddressMisaligned);
@@ -507,7 +517,7 @@ int main() {
 	Memory self_branch_memory{ 4 };
 	self_branch_cpu.write_register(1, 42);
 	self_branch_memory.write32(0, 0x00108063); // BEQ x1, x1, 0
-	self_branch_cpu.step(self_branch_memory);
+	step_with_ram(self_branch_cpu, self_branch_memory);
 	assert(self_branch_cpu.read_pc() == 0);
 	assert(self_branch_cpu.read_register(1) == 42);
 
@@ -520,10 +530,10 @@ int main() {
 	signed_forward_branch_memory.write32(4, 0x00100193); // ADDI x3, x0, 1 (skipped)
 	signed_forward_branch_memory.write32(8, 0x00200193); // ADDI x3, x0, 2
 
-	signed_forward_branch_cpu.step(signed_forward_branch_memory);
+	step_with_ram(signed_forward_branch_cpu, signed_forward_branch_memory);
 	assert(signed_forward_branch_cpu.read_pc() == 8);
 	assert(signed_forward_branch_cpu.read_register(3) == 0);
-	signed_forward_branch_cpu.step(signed_forward_branch_memory);
+	step_with_ram(signed_forward_branch_cpu, signed_forward_branch_memory);
 	assert(signed_forward_branch_cpu.read_pc() == 12);
 	assert(signed_forward_branch_cpu.read_register(3) == 2);
 	assert(signed_forward_branch_cpu.read_register(1) == 0xFFFFFFFFu);
@@ -538,7 +548,7 @@ int main() {
 	equal_bge_memory.write32(0, 0x0020D463); // BGE x1, x2, +8
 	equal_bge_memory.write32(4, 0x00100213); // ADDI x4, x0, 1 (skipped)
 
-	equal_bge_cpu.step(equal_bge_memory);
+	step_with_ram(equal_bge_cpu, equal_bge_memory);
 	assert(equal_bge_cpu.read_pc() == 8);
 	assert(equal_bge_cpu.read_register(4) == 0);
 	assert(equal_bge_cpu.read_register(1) == 0x80000000u);
@@ -553,10 +563,10 @@ int main() {
 	not_taken_bltu_memory.write32(0, 0x0020E463); // BLTU x1, x2, +8 (not taken)
 	not_taken_bltu_memory.write32(4, 0x00100193); // ADDI x3, x0, 1
 
-	not_taken_bltu_cpu.step(not_taken_bltu_memory);
+	step_with_ram(not_taken_bltu_cpu, not_taken_bltu_memory);
 	assert(not_taken_bltu_cpu.read_pc() == 4);
 	assert(not_taken_bltu_cpu.read_register(3) == 0);
-	not_taken_bltu_cpu.step(not_taken_bltu_memory);
+	step_with_ram(not_taken_bltu_cpu, not_taken_bltu_memory);
 	assert(not_taken_bltu_cpu.read_pc() == 8);
 	assert(not_taken_bltu_cpu.read_register(3) == 1);
 	assert(not_taken_bltu_cpu.read_register(1) == 0xFFFFFFFFu);
@@ -572,10 +582,10 @@ int main() {
 	taken_bgeu_memory.write32(4, 0x00100213); // ADDI x4, x0, 1 (skipped)
 	taken_bgeu_memory.write32(8, 0x00200213); // ADDI x4, x0, 2
 
-	taken_bgeu_cpu.step(taken_bgeu_memory);
+	step_with_ram(taken_bgeu_cpu, taken_bgeu_memory);
 	assert(taken_bgeu_cpu.read_pc() == 8);
 	assert(taken_bgeu_cpu.read_register(4) == 0);
-	taken_bgeu_cpu.step(taken_bgeu_memory);
+	step_with_ram(taken_bgeu_cpu, taken_bgeu_memory);
 	assert(taken_bgeu_cpu.read_pc() == 12);
 	assert(taken_bgeu_cpu.read_register(4) == 2);
 	assert(taken_bgeu_cpu.read_register(1) == 0xFFFFFFFFu);
@@ -589,17 +599,17 @@ int main() {
 	lui_memory.write32(4, 0xFFFFF137); // LUI x2, 0xFFFFF
 	lui_memory.write32(8, 0xABCDE037); // LUI x0, 0xABCDE
 
-	lui_cpu.step(lui_memory);
+	step_with_ram(lui_cpu, lui_memory);
 	assert(lui_cpu.read_pc() == 4);
 	assert(lui_cpu.read_register(1) == 0x12345000u);
 	assert(lui_cpu.read_register(2) == 0);
 
-	lui_cpu.step(lui_memory);
+	step_with_ram(lui_cpu, lui_memory);
 	assert(lui_cpu.read_pc() == 8);
 	assert(lui_cpu.read_register(1) == 0x12345000u);
 	assert(lui_cpu.read_register(2) == 0xFFFFF000u);
 
-	lui_cpu.step(lui_memory);
+	step_with_ram(lui_cpu, lui_memory);
 	assert(lui_cpu.read_pc() == 12);
 	assert(lui_cpu.read_register(0) == 0);
 	assert(lui_cpu.read_register(1) == 0x12345000u);
@@ -615,18 +625,18 @@ int main() {
 	auipc_memory.write32(4, 0x00000117); // AUIPC x2, 0
 	auipc_memory.write32(8, 0xABCDE017); // AUIPC x0, 0xABCDE
 
-	auipc_cpu.step(auipc_memory);
+	step_with_ram(auipc_cpu, auipc_memory);
 	assert(auipc_cpu.read_pc() == 4);
 	assert(auipc_cpu.read_register(1) == 0x12345000u);
 	assert(auipc_cpu.read_register(2) == 0);
 
 	// The instruction at address 4 uses 4, not the following PC value 8
-	auipc_cpu.step(auipc_memory);
+	step_with_ram(auipc_cpu, auipc_memory);
 	assert(auipc_cpu.read_pc() == 8);
 	assert(auipc_cpu.read_register(1) == 0x12345000u);
 	assert(auipc_cpu.read_register(2) == 4);
 
-	auipc_cpu.step(auipc_memory);
+	step_with_ram(auipc_cpu, auipc_memory);
 	assert(auipc_cpu.read_pc() == 12);
 	assert(auipc_cpu.read_register(0) == 0);
 	assert(auipc_cpu.read_register(1) == 0x12345000u);
@@ -642,12 +652,12 @@ int main() {
 	jal_memory.write32(4, 0x00100113); // ADDI x2, x0, 1 (skipped)
 	jal_memory.write32(8, 0x00200113); // ADDI x2, x0, 2
 
-	jal_cpu.step(jal_memory);
+	step_with_ram(jal_cpu, jal_memory);
 	assert(jal_cpu.read_pc() == 8);
 	assert(jal_cpu.read_register(1) == 4);
 	assert(jal_cpu.read_register(2) == 0);
 
-	jal_cpu.step(jal_memory);
+	step_with_ram(jal_cpu, jal_memory);
 	assert(jal_cpu.read_pc() == 12);
 	assert(jal_cpu.read_register(1) == 4);
 	assert(jal_cpu.read_register(2) == 2);
@@ -665,7 +675,7 @@ int main() {
 
 	bool jal_exception_thrown{ false };
 	try {
-		failed_jal_cpu.step(failed_jal_memory);
+		step_with_ram(failed_jal_cpu, failed_jal_memory);
 	} catch (const Trap& trap) {
 		jal_exception_thrown = true;
 		assert(trap.cause == TrapCause::InstructionAddressMisaligned);
@@ -685,13 +695,13 @@ int main() {
 	jalr_memory.write32(4, 0x00100193); // ADDI x3, x0, 1 (skipped)
 	jalr_memory.write32(8, 0x00200193); // ADDI x3, x0, 2
 
-	jalr_cpu.step(jalr_memory);
+	step_with_ram(jalr_cpu, jalr_memory);
 	assert(jalr_cpu.read_pc() == 8);
 	assert(jalr_cpu.read_register(1) == 4);
 	assert(jalr_cpu.read_register(2) == 9);
 	assert(jalr_cpu.read_register(3) == 0);
 
-	jalr_cpu.step(jalr_memory);
+	step_with_ram(jalr_cpu, jalr_memory);
 	assert(jalr_cpu.read_pc() == 12);
 	assert(jalr_cpu.read_register(1) == 4);
 	assert(jalr_cpu.read_register(2) == 9);
@@ -711,7 +721,7 @@ int main() {
 
 	bool jalr_exception_thrown{ false };
 	try {
-		failed_jalr_cpu.step(failed_jalr_memory);
+		step_with_ram(failed_jalr_cpu, failed_jalr_memory);
 	} catch (const Trap& trap) {
 		jalr_exception_thrown = true;
 		assert(trap.cause == TrapCause::InstructionAddressMisaligned);
@@ -734,22 +744,22 @@ int main() {
 	fence_memory.write32(8, 0x0FF1008F); // FENCE with ignored rs1 and rd fields
 	fence_memory.write32(12, 0x00700193); // ADDI x3, x0, 7
 
-	fence_cpu.step(fence_memory);
+	step_with_ram(fence_cpu, fence_memory);
 	assert(fence_cpu.read_pc() == 4);
 	assert(fence_cpu.read_register(1) == 0xDEADBEEFu);
 	assert(fence_cpu.read_register(2) == 0xCAFEBABEu);
 
-	fence_cpu.step(fence_memory);
+	step_with_ram(fence_cpu, fence_memory);
 	assert(fence_cpu.read_pc() == 8);
 	assert(fence_cpu.read_register(1) == 0xDEADBEEFu);
 	assert(fence_cpu.read_register(2) == 0xCAFEBABEu);
 
-	fence_cpu.step(fence_memory);
+	step_with_ram(fence_cpu, fence_memory);
 	assert(fence_cpu.read_pc() == 12);
 	assert(fence_cpu.read_register(1) == 0xDEADBEEFu);
 	assert(fence_cpu.read_register(2) == 0xCAFEBABEu);
 
-	fence_cpu.step(fence_memory);
+	step_with_ram(fence_cpu, fence_memory);
 	assert(fence_cpu.read_pc() == 16);
 	assert(fence_cpu.read_register(1) == 0xDEADBEEFu);
 	assert(fence_cpu.read_register(2) == 0xCAFEBABEu);
@@ -767,7 +777,7 @@ int main() {
 	bool fence_i_trap_thrown{ false };
 	TrapCause fence_i_trap_cause{ TrapCause::BreakPoint };
 	try {
-		fence_i_cpu.step(fence_i_memory);
+		step_with_ram(fence_i_cpu, fence_i_memory);
 	} catch (const Trap& trap) {
 		fence_i_trap_thrown = true;
 		fence_i_trap_cause = trap.cause;
@@ -789,7 +799,7 @@ int main() {
 	bool trap_thrown{ false };
 	TrapCause trap_cause{ TrapCause::BreakPoint };
 	try {
-		ecall_cpu.step(ecall_memory);
+		step_with_ram(ecall_cpu, ecall_memory);
 	} catch (const Trap& trap) {
 		trap_thrown = true;
 		trap_cause = trap.cause;
@@ -812,7 +822,7 @@ int main() {
 	trap_thrown = false;
 	trap_cause = TrapCause::EnvironmentCall;
 	try {
-		ebreak_cpu.step(ebreak_memory);
+		step_with_ram(ebreak_cpu, ebreak_memory);
 	} catch (const Trap& trap) {
 		trap_thrown = true;
 		trap_cause = trap.cause;
@@ -829,7 +839,7 @@ int main() {
 	cpu.set_pc(2);
 	exception_thrown = false;
 	try {
-		cpu.step(memory);
+		step_with_ram(cpu, memory);
 	} catch (const Trap& trap) {
 		exception_thrown = true;
 		assert(trap.cause == TrapCause::InstructionAddressMisaligned);

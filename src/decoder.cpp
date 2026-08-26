@@ -1,5 +1,5 @@
-#include <cstdint>
 #include "decoder.hpp"
+#include <cstdint>
 
 namespace {
 

@@ -23,11 +23,13 @@ add_library(riscv_core
 		src/program_loader.cpp
 		src/runner.cpp
 		src/elf_loader.cpp
+		src/bus.cpp
 )
 
 add_executable(risc-v-emulator)
 add_executable(cpu_test)
 add_executable(memory_test)
+add_executable(bus_test)
 add_executable(fetch_test)
 add_executable(decoder_test)
 add_executable(execute_test)
@@ -50,6 +52,11 @@ target_sources(cpu_test
 target_sources(memory_test
 	PRIVATE
 		tests/memory_test.cpp
+)
+
+target_sources(bus_test
+	PRIVATE
+		tests/bus_test.cpp
 )
 
 target_sources(fetch_test
@@ -122,6 +129,11 @@ target_link_libraries(memory_test
 		riscv_core
 )
 
+target_link_libraries(bus_test
+	PRIVATE
+		riscv_core
+)
+
 target_link_libraries(decoder_test
 	PRIVATE
 		riscv_core
@@ -161,6 +173,7 @@ enable_project_warnings(riscv_core)
 enable_project_warnings(risc-v-emulator)
 enable_project_warnings(cpu_test)
 enable_project_warnings(memory_test)
+enable_project_warnings(bus_test)
 enable_project_warnings(fetch_test)
 enable_project_warnings(decoder_test)
 enable_project_warnings(execute_test)
@@ -178,6 +191,11 @@ add_test(
 add_test(
 	NAME memory_test
 	COMMAND memory_test
+)
+
+add_test(
+	NAME bus_test
+	COMMAND bus_test
 )
 
 add_test(

@@ -1,3 +1,4 @@
+#include "bus.hpp"
 #include "cpu.hpp"
 #include "elf_loader.hpp"
 #include "executor.hpp"
@@ -68,10 +69,11 @@ int main() {
 	const auto elf_bytes{ make_executable_elf() };
 	Memory memory{ 512 };
 	const auto entry{ load_elf32(memory, elf_bytes) };
+	Bus bus{ memory, 0 };
 
 	Cpu cpu{};
 	cpu.set_pc(entry);
-	const auto result{ run_until_trap(cpu, memory, 10) };
+	const auto result{ run_until_trap(cpu, bus, 10) };
 
 	assert(entry == 0x100u);
 	assert(memory.read32(0x100u) == 0x00500093u);

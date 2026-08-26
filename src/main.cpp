@@ -7,6 +7,7 @@
 #include <filesystem>
 #include "cpu.hpp"
 #include "memory.hpp"
+#include "bus.hpp"
 #include "program_loader.hpp"
 #include "elf_loader.hpp"
 #include "runner.hpp"
@@ -18,17 +19,18 @@ int main(int argc, char** argv) {
 	}
 
 	try {	
-
 		auto bytes{ read_binary_file(std::filesystem::path{ argv[1] }) };
 		constexpr std::size_t memory_size{ 64 * 1024 };
 
 		Memory memory{ memory_size };
 		auto entry{ load_elf32(memory, bytes) };
 
+		Bus bus{ memory, 0 };
+
 		Cpu cpu{};
 		cpu.set_pc(entry);
 
-		auto result{ run_until_trap(cpu, memory, 1'000'000) };
+		auto result{ run_until_trap(cpu, bus, 1'000'000) };
 		auto rc{ EXIT_SUCCESS };
 
 		std::cout << "stopped by ";

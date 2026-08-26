@@ -1,11 +1,11 @@
 #include "executor.hpp"
-#include "memory.hpp"
+#include "bus.hpp"
 #include <bit>
 #include <cstdint>
 #include <optional>
 #include <stdexcept>
 
-std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& instruction, Memory& memory) {
+std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& instruction, Bus& bus) {
 	switch (decode_operation(instruction)) {
 		case Operation::Add: {
 			auto result{ cpu.read_register(instruction.rs1) + cpu.read_register(instruction.rs2) };
@@ -146,7 +146,7 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			
 			std::uint32_t value{};
 			try {
-				value = memory.read32(address);
+				value = bus.read32(address);
 			} catch (const std::out_of_range&) {
 				throw Trap{ TrapCause::LoadAccessFault };
 			}
@@ -161,8 +161,9 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 				throw Trap{ TrapCause::StoreAddressMisaligned };
 			}
 			
+			auto rs2{ cpu.read_register(instruction.rs2) };
 			try {
-				memory.write32(address, cpu.read_register(instruction.rs2));
+				bus.write32(address, rs2);
 			} catch (const std::out_of_range&) {
 				throw Trap{ TrapCause::StoreAccessFault };
 			}
@@ -174,7 +175,7 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			std::uint32_t result{};
 
 			try {
-				result = memory.read8(address);
+				result = bus.read8(address);
 			} catch (const std::out_of_range&) {
 				throw Trap{ TrapCause::LoadAccessFault };
 			}
@@ -192,7 +193,7 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			std::uint32_t result{};
 
 			try {
-				result = memory.read8(address);
+				result = bus.read8(address);
 			} catch (const std::out_of_range&) {
 				throw Trap{ TrapCause::LoadAccessFault };
 			}
@@ -205,9 +206,10 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			auto address{ cpu.read_register(instruction.rs1) + instruction.imm };
 			
 			std::uint8_t value{};
-			try {
-				value = static_cast<std::uint8_t>(cpu.read_register(instruction.rs2));
-				memory.write8(address, value);
+			auto rs2{ cpu.read_register(instruction.rs2) };
+ 			try {
+				value = static_cast<std::uint8_t>(rs2);
+				bus.write8(address, value);
 			} catch (const std::out_of_range&) {
 				throw Trap{ TrapCause::StoreAccessFault };
 			}
@@ -223,7 +225,7 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 
 			std::uint32_t result{};
 			try {
-				result = memory.read16(address);
+				result = bus.read16(address);
 			} catch (const std::out_of_range&) {
 				throw Trap{ TrapCause::LoadAccessFault };
 			}
@@ -244,7 +246,7 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 
 			std::uint32_t result{};
 			try {
-				result = memory.read16(address);
+				result = bus.read16(address);
 			} catch (const std::out_of_range&) {
 				throw Trap{ TrapCause::LoadAccessFault };
 			}	
@@ -260,9 +262,10 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			}
 
 			std::uint16_t value{};
+			auto rs2{ cpu.read_register(instruction.rs2) };
 			try {
-				value = static_cast<std::uint16_t>(cpu.read_register(instruction.rs2));
-				memory.write16(address, value);
+				value = static_cast<std::uint16_t>(rs2);
+				bus.write16(address, value);
 			} catch (const std::out_of_range&) {
 				throw Trap{ TrapCause::StoreAccessFault };
 			}

@@ -1,13 +1,15 @@
 #include "runner.hpp"
 #include "cpu.hpp"
-#include "memory.hpp"
+#include "bus.hpp"
+#include <cstddef>
+#include <optional>
 
-RunResult run_until_trap(Cpu& cpu, Memory& memory, std::size_t max_instruction_count) {
+RunResult run_until_trap(Cpu& cpu, Bus& bus, std::size_t max_instruction_count) {
 	std::size_t instructions_retired{};
 
 	try {
 		while (instructions_retired < max_instruction_count) {
-			cpu.step(memory);
+			cpu.step(bus);
 			instructions_retired++;
 		}
 	} catch (const Trap& trap) {

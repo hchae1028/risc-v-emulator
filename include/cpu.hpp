@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <array>
 
-class Memory;
+class Bus;
 
 class Cpu {
 private:
@@ -27,9 +27,9 @@ public:
 		m_pc = pc;
 	}
 
-	std::uint32_t fetch_instruction(const Memory& memory) const;
+	std::uint32_t fetch_instruction(const Bus& bus) const;
 
-	void step(Memory& memory);
+	void step(Bus& bus);
 };
 
 #endif

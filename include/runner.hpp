@@ -6,13 +6,13 @@
 #include <optional>
 
 class Cpu;
-class Memory;
+class Bus;
 
 struct RunResult {
 	std::optional<TrapCause> trap;
 	std::size_t instructions_retired;
 };
 
-RunResult run_until_trap(Cpu& cpu, Memory& memory, std::size_t max_instruction_count);
+RunResult run_until_trap(Cpu& cpu, Bus& bus, std::size_t max_instruction_count);
 
 #endif

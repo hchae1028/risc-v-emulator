@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <optional>
 
-class Memory;
+class Bus;
 
 enum class TrapCause {
 	EnvironmentCall,
@@ -24,6 +24,6 @@ struct Trap {
 	TrapCause cause;
 };
 
-std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& instruction, Memory& memory);
+std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& instruction, Bus& bus);
 
 #endif

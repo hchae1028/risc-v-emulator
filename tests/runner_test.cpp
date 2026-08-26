@@ -1,3 +1,4 @@
+#include "bus.hpp"
 #include "cpu.hpp"
 #include "executor.hpp"
 #include "memory.hpp"
@@ -6,6 +7,15 @@
 #include <cassert>
 #include <cstdint>
 #include <stdexcept>
+
+namespace {
+
+RunResult run_with_ram(Cpu& cpu, Memory& ram, std::size_t max_instruction_count) {
+	Bus bus{ ram, 0 };
+	return run_until_trap(cpu, bus, max_instruction_count);
+}
+
+}
 
 int main() {
 	/* Run a complete hand-encoded program until EBREAK */
@@ -19,7 +29,7 @@ int main() {
 	Memory memory{ program_bytes.size() };
 	memory.load_bytes(0, program_bytes);
 
-	const auto result{ run_until_trap(cpu, memory, 10) };
+	const auto result{ run_with_ram(cpu, memory, 10) };
 	assert(result.trap.has_value());
 	assert(*result.trap == TrapCause::BreakPoint);
 	assert(result.instructions_retired == 3);
@@ -37,7 +47,7 @@ int main() {
 	Memory ecall_memory{ 8 };
 	ecall_memory.write32(0, 0x00500093); // ADDI x1, x0, 5
 	ecall_memory.write32(4, 0x00000073); // ECALL
-	const auto ecall_result{ run_until_trap(ecall_cpu, ecall_memory, 10) };
+	const auto ecall_result{ run_with_ram(ecall_cpu, ecall_memory, 10) };
 	assert(ecall_result.trap.has_value());
 	assert(*ecall_result.trap == TrapCause::EnvironmentCall);
 	assert(ecall_result.instructions_retired == 1);
@@ -50,7 +60,7 @@ int main() {
 	Cpu loop_cpu{};
 	Memory loop_memory{ 4 };
 	loop_memory.write32(0, 0x0000006F); // JAL x0, 0
-	const auto loop_result{ run_until_trap(loop_cpu, loop_memory, 5) };
+	const auto loop_result{ run_with_ram(loop_cpu, loop_memory, 5) };
 	assert(!loop_result.trap.has_value());
 	assert(loop_result.instructions_retired == 5);
 	assert(loop_cpu.read_pc() == 0);
@@ -62,7 +72,7 @@ int main() {
 	Memory zero_budget_memory{ 4 };
 	zero_budget_cpu.write_register(1, 0xDEADBEEFu);
 	zero_budget_memory.write32(0, 0x00500093);
-	const auto zero_budget_result{ run_until_trap(zero_budget_cpu, zero_budget_memory, 0) };
+	const auto zero_budget_result{ run_with_ram(zero_budget_cpu, zero_budget_memory, 0) };
 	assert(!zero_budget_result.trap.has_value());
 	assert(zero_budget_result.instructions_retired == 0);
 	assert(zero_budget_cpu.read_pc() == 0);
@@ -74,14 +84,14 @@ int main() {
 	Memory exact_budget_memory{ 8 };
 	exact_budget_memory.write32(0, 0x00500093); // ADDI x1, x0, 5
 	exact_budget_memory.write32(4, 0x00100073); // EBREAK
-	auto exact_budget_result{ run_until_trap(exact_budget_cpu, exact_budget_memory, 1) };
+	auto exact_budget_result{ run_with_ram(exact_budget_cpu, exact_budget_memory, 1) };
 	assert(!exact_budget_result.trap.has_value());
 	assert(exact_budget_result.instructions_retired == 1);
 	assert(exact_budget_cpu.read_pc() == 4);
 	assert(exact_budget_cpu.read_register(1) == 5);
 
 	// A later run resumes at the trap and reports zero newly retired instructions
-	exact_budget_result = run_until_trap(exact_budget_cpu, exact_budget_memory, 1);
+	exact_budget_result = run_with_ram(exact_budget_cpu, exact_budget_memory, 1);
 	assert(exact_budget_result.trap.has_value());
 	assert(*exact_budget_result.trap == TrapCause::BreakPoint);
 	assert(exact_budget_result.instructions_retired == 0);
@@ -93,7 +103,7 @@ int main() {
 	Memory illegal_memory{ 4 };
 	illegal_cpu.write_register(1, 0x12345678u);
 	illegal_memory.write32(0, 0xFFFFFFFFu);
-	const auto illegal_result{ run_until_trap(illegal_cpu, illegal_memory, 1) };
+	const auto illegal_result{ run_with_ram(illegal_cpu, illegal_memory, 1) };
 	assert(illegal_result.trap.has_value());
 	assert(*illegal_result.trap == TrapCause::IllegalInstruction);
 	assert(illegal_result.instructions_retired == 0);
@@ -107,7 +117,7 @@ int main() {
 	malformed_cpu.write_register(3, 0xDEADBEEFu);
 	malformed_memory.write32(0, 0x00500093u); // ADDI x1, x0, 5
 	malformed_memory.write32(4, 0x02409193u); // SLLI with reserved upper immediate bits
-	const auto malformed_result{ run_until_trap(malformed_cpu, malformed_memory, 2) };
+	const auto malformed_result{ run_with_ram(malformed_cpu, malformed_memory, 2) };
 	assert(malformed_result.trap.has_value());
 	assert(*malformed_result.trap == TrapCause::IllegalInstruction);
 	assert(malformed_result.instructions_retired == 1);
@@ -125,7 +135,7 @@ int main() {
 	unsupported_extension_cpu.write_register(3, 0xCAFEBABEu);
 	unsupported_extension_memory.write32(0, 0x022081B3u); // MUL x3, x1, x2
 	const auto unsupported_extension_result{
-		run_until_trap(unsupported_extension_cpu, unsupported_extension_memory, 1)
+		run_with_ram(unsupported_extension_cpu, unsupported_extension_memory, 1)
 	};
 	assert(unsupported_extension_result.trap.has_value());
 	assert(*unsupported_extension_result.trap == TrapCause::IllegalInstruction);
@@ -144,7 +154,7 @@ int main() {
 	misaligned_fetch_memory.write32(0, 0xA5A5A5A5u);
 	misaligned_fetch_memory.write32(4, 0x5A5A5A5Au);
 	const auto misaligned_fetch_result{
-		run_until_trap(misaligned_fetch_cpu, misaligned_fetch_memory, 1)
+		run_with_ram(misaligned_fetch_cpu, misaligned_fetch_memory, 1)
 	};
 	assert(misaligned_fetch_result.trap.has_value());
 	assert(*misaligned_fetch_result.trap == TrapCause::InstructionAddressMisaligned);
@@ -161,7 +171,7 @@ int main() {
 	misaligned_jump_memory.write32(0, 0x00500213u); // ADDI x4, x0, 5
 	misaligned_jump_memory.write32(4, 0x002002EFu); // JAL x5, +2
 	const auto misaligned_jump_result{
-		run_until_trap(misaligned_jump_cpu, misaligned_jump_memory, 2)
+		run_with_ram(misaligned_jump_cpu, misaligned_jump_memory, 2)
 	};
 	assert(misaligned_jump_result.trap.has_value());
 	assert(*misaligned_jump_result.trap == TrapCause::InstructionAddressMisaligned);
@@ -179,7 +189,7 @@ int main() {
 	misaligned_load_memory.write32(0, 0x00500213u); // ADDI x4, x0, 5
 	misaligned_load_memory.write32(4, 0x0000A183u); // LW x3, 0(x1)
 	const auto misaligned_load_result{
-		run_until_trap(misaligned_load_cpu, misaligned_load_memory, 2)
+		run_with_ram(misaligned_load_cpu, misaligned_load_memory, 2)
 	};
 	assert(misaligned_load_result.trap.has_value());
 	assert(*misaligned_load_result.trap == TrapCause::LoadAddressMisaligned);
@@ -198,7 +208,7 @@ int main() {
 	misaligned_store_memory.write32(0, 0x00500213u); // ADDI x4, x0, 5
 	misaligned_store_memory.write32(4, 0x0020A023u); // SW x2, 0(x1)
 	const auto misaligned_store_result{
-		run_until_trap(misaligned_store_cpu, misaligned_store_memory, 2)
+		run_with_ram(misaligned_store_cpu, misaligned_store_memory, 2)
 	};
 	assert(misaligned_store_result.trap.has_value());
 	assert(*misaligned_store_result.trap == TrapCause::StoreAddressMisaligned);
@@ -215,7 +225,7 @@ int main() {
 	instruction_access_cpu.set_pc(4);
 	instruction_access_cpu.write_register(1, 0x87654321u);
 	const auto instruction_access_result{
-		run_until_trap(instruction_access_cpu, instruction_access_memory, 1)
+		run_with_ram(instruction_access_cpu, instruction_access_memory, 1)
 	};
 	assert(instruction_access_result.trap.has_value());
 	assert(*instruction_access_result.trap == TrapCause::InstructionAccessFault);
@@ -231,7 +241,7 @@ int main() {
 	load_access_memory.write32(0, 0x00500213u); // ADDI x4, x0, 5
 	load_access_memory.write32(4, 0x0000A183u); // LW x3, 0(x1)
 	const auto load_access_result{
-		run_until_trap(load_access_cpu, load_access_memory, 2)
+		run_with_ram(load_access_cpu, load_access_memory, 2)
 	};
 	assert(load_access_result.trap.has_value());
 	assert(*load_access_result.trap == TrapCause::LoadAccessFault);
@@ -250,7 +260,7 @@ int main() {
 	store_access_memory.write32(0, 0x00500213u); // ADDI x4, x0, 5
 	store_access_memory.write32(4, 0x0020A023u); // SW x2, 0(x1)
 	const auto store_access_result{
-		run_until_trap(store_access_cpu, store_access_memory, 2)
+		run_with_ram(store_access_cpu, store_access_memory, 2)
 	};
 	assert(store_access_result.trap.has_value());
 	assert(*store_access_result.trap == TrapCause::StoreAccessFault);
@@ -260,6 +270,28 @@ int main() {
 	assert(store_access_cpu.read_register(4) == 5);
 	assert(store_access_memory.read32(0) == 0x00500213u);
 	assert(store_access_memory.read32(4) == 0x0020A023u);
+
+	/* Fetch, load, and store use physical bus addresses with nonzero-based RAM */
+	constexpr std::uint32_t mapped_ram_base{ 0x80000000u };
+	Memory mapped_ram{ 24 };
+	mapped_ram.write32(0, 0x800000B7u);  // LUI x1, 0x80000
+	mapped_ram.write32(4, 0x0100A103u);  // LW x2, 16(x1)
+	mapped_ram.write32(8, 0x0020AA23u);  // SW x2, 20(x1)
+	mapped_ram.write32(12, 0x00100073u); // EBREAK
+	mapped_ram.write32(16, 0x12345678u);
+	Bus mapped_bus{ mapped_ram, mapped_ram_base };
+	Cpu mapped_cpu{};
+	mapped_cpu.set_pc(mapped_ram_base);
+
+	const auto mapped_result{ run_until_trap(mapped_cpu, mapped_bus, 10) };
+	assert(mapped_result.trap.has_value());
+	assert(*mapped_result.trap == TrapCause::BreakPoint);
+	assert(mapped_result.instructions_retired == 3);
+	assert(mapped_cpu.read_pc() == mapped_ram_base + 12);
+	assert(mapped_cpu.read_register(1) == mapped_ram_base);
+	assert(mapped_cpu.read_register(2) == 0x12345678u);
+	assert(mapped_ram.read32(16) == 0x12345678u);
+	assert(mapped_ram.read32(20) == 0x12345678u);
 
 	return 0;
 }

@@ -1,5 +1,7 @@
 #include "memory.hpp"
+#include <cstddef>
 #include <cstdint>
+#include <span>
 #include <stdexcept>
 
 Memory::Memory(std::size_t size)

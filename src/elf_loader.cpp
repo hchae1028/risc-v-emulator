@@ -2,7 +2,10 @@
 #include "memory.hpp"
 #include <bit>
 #include <cstddef>
+#include <cstdint>
+#include <span>
 #include <stdexcept>
+#include <vector>
 
 namespace {
 
@@ -234,4 +237,3 @@ std::uint32_t load_elf32(Memory& memory, std::span<const std::uint8_t> bytes) {
 
 	return header.entry;
 }
-
