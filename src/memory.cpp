@@ -23,7 +23,7 @@ std::size_t Memory::size() const {
 	return m_bytes.size();
 }
 
-[[nodiscard]] std::uint8_t Memory::read8(std::uint32_t address) const {
+[[nodiscard]] std::uint8_t Memory::read8(std::uint32_t address) {
 	validate_range(address, 1);
 	return m_bytes[address];
 }
@@ -33,7 +33,7 @@ void Memory::write8(std::uint32_t address, std::uint8_t value) {
 	m_bytes[address] = value;
 }
 
-[[nodiscard]] std::uint32_t Memory::read32(std::uint32_t address) const {
+[[nodiscard]] std::uint32_t Memory::read32(std::uint32_t address) {
 	validate_range(address, 4);
 
 	std::uint32_t read{};
@@ -55,7 +55,7 @@ void Memory::write32(std::uint32_t address, std::uint32_t value) {
 	}
 }
 
-[[nodiscard]] std::uint16_t Memory::read16(std::uint32_t address) const {
+[[nodiscard]] std::uint16_t Memory::read16(std::uint32_t address) {
 	validate_range(address, 2);
 
 	std::uint16_t read{};

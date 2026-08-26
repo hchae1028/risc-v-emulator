@@ -21,7 +21,7 @@ void Cpu::write_register(std::size_t index, std::uint32_t value) {
 	m_registers.at(index) = value;
 }
 
-std::uint32_t Cpu::fetch_instruction(const Bus& bus) const {
+std::uint32_t Cpu::fetch_instruction(Bus& bus) const {
 	if (m_pc % 4 != 0) {
 		throw Trap{ TrapCause::InstructionAddressMisaligned };
 	}

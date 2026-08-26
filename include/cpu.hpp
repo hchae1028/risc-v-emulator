@@ -27,7 +27,7 @@ public:
 		m_pc = pc;
 	}
 
-	std::uint32_t fetch_instruction(const Bus& bus) const;
+	std::uint32_t fetch_instruction(Bus& bus) const;
 
 	void step(Bus& bus);
 };

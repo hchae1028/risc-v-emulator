@@ -70,7 +70,7 @@ void fill_memory(Memory& memory, std::uint8_t value) {
 	}
 }
 
-void assert_memory_filled(const Memory& memory, std::uint8_t value) {
+void assert_memory_filled(Memory& memory, std::uint8_t value) {
 	for (std::size_t i{}; i < memory.size(); i++) {
 		assert(memory.read8(static_cast<std::uint32_t>(i)) == value);
 	}
