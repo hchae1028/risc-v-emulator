@@ -24,12 +24,15 @@ add_library(riscv_core
 		src/runner.cpp
 		src/elf_loader.cpp
 		src/bus.cpp
+		src/uart_device.cpp
 )
 
 add_executable(risc-v-emulator)
 add_executable(cpu_test)
 add_executable(memory_test)
 add_executable(bus_test)
+add_executable(uart_device_test)
+add_executable(uart_execution_test)
 add_executable(fetch_test)
 add_executable(decoder_test)
 add_executable(execute_test)
@@ -57,6 +60,16 @@ target_sources(memory_test
 target_sources(bus_test
 	PRIVATE
 		tests/bus_test.cpp
+)
+
+target_sources(uart_device_test
+	PRIVATE
+		tests/uart_device_test.cpp
+)
+
+target_sources(uart_execution_test
+	PRIVATE
+		tests/uart_execution_test.cpp
 )
 
 target_sources(fetch_test
@@ -134,6 +147,16 @@ target_link_libraries(bus_test
 		riscv_core
 )
 
+target_link_libraries(uart_device_test
+	PRIVATE
+		riscv_core
+)
+
+target_link_libraries(uart_execution_test
+	PRIVATE
+		riscv_core
+)
+
 target_link_libraries(decoder_test
 	PRIVATE
 		riscv_core
@@ -174,6 +197,8 @@ enable_project_warnings(risc-v-emulator)
 enable_project_warnings(cpu_test)
 enable_project_warnings(memory_test)
 enable_project_warnings(bus_test)
+enable_project_warnings(uart_device_test)
+enable_project_warnings(uart_execution_test)
 enable_project_warnings(fetch_test)
 enable_project_warnings(decoder_test)
 enable_project_warnings(execute_test)
@@ -196,6 +221,16 @@ add_test(
 add_test(
 	NAME bus_test
 	COMMAND bus_test
+)
+
+add_test(
+	NAME uart_device_test
+	COMMAND uart_device_test
+)
+
+add_test(
+	NAME uart_execution_test
+	COMMAND uart_execution_test
 )
 
 add_test(
@@ -243,6 +278,7 @@ find_program(RISCV_GCC riscv64-elf-gcc)
 if(RISCV_GCC)
 	set(EXAMPLE_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/examples)
 	set(ADD_C_ELF ${EXAMPLE_OUTPUT_DIR}/add_c.elf)
+	set(UART_C_ELF ${EXAMPLE_OUTPUT_DIR}/uart_c.elf)
 
 	add_custom_command(
 		OUTPUT ${ADD_C_ELF}
@@ -271,6 +307,34 @@ if(RISCV_GCC)
 	add_custom_target(add_c_example ALL
 		DEPENDS ${ADD_C_ELF}
 	)
+	
+	add_custom_command(
+		OUTPUT ${UART_C_ELF}
+		COMMAND ${CMAKE_COMMAND} -E make_directory ${EXAMPLE_OUTPUT_DIR}
+		COMMAND ${RISCV_GCC}
+			-march=rv32i
+			-mabi=ilp32
+			-ffreestanding
+			-nostdlib
+			-nostartfiles
+			-fno-pic
+			-fno-pie
+			-O0
+			-Wl,--build-id=none
+			-T ${CMAKE_CURRENT_SOURCE_DIR}/examples/linker.ld
+			${CMAKE_CURRENT_SOURCE_DIR}/examples/uart_start.S
+			${CMAKE_CURRENT_SOURCE_DIR}/examples/uart.c
+			-o ${UART_C_ELF}
+		DEPENDS
+			${CMAKE_CURRENT_SOURCE_DIR}/examples/linker.ld
+			${CMAKE_CURRENT_SOURCE_DIR}/examples/uart_start.S
+			${CMAKE_CURRENT_SOURCE_DIR}/examples/uart.c
+		VERBATIM
+	)
+
+	add_custom_target(uart_c_example ALL
+		DEPENDS ${UART_C_ELF}
+	)
 
 	add_test(
 		NAME add_c_example_test
@@ -278,6 +342,14 @@ if(RISCV_GCC)
 			-DEMULATOR=$<TARGET_FILE:risc-v-emulator>
 			-DGUEST_ELF=${ADD_C_ELF}
 			-P ${CMAKE_CURRENT_SOURCE_DIR}/tests/add_c_example_test.cmake
+	)
+
+	add_test(
+		NAME uart_c_example_test
+		COMMAND ${CMAKE_COMMAND}
+			-DEMULATOR=$<TARGET_FILE:risc-v-emulator>
+			-DGUEST_ELF=${UART_C_ELF}
+			-P ${CMAKE_CURRENT_SOURCE_DIR}/tests/uart_c_example_test.cmake
 	)
 
 	message(STATUS "RISC-V cross-compiler found: ${RISCV_GCC}")

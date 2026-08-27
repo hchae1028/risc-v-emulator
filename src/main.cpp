@@ -11,6 +11,7 @@
 #include "program_loader.hpp"
 #include "elf_loader.hpp"
 #include "runner.hpp"
+#include "uart_device.hpp"
 
 int main(int argc, char** argv) {
 	if (argc != 2) {
@@ -25,7 +26,10 @@ int main(int argc, char** argv) {
 		Memory memory{ memory_size };
 		auto entry{ load_elf32(memory, bytes) };
 
+		UartDevice uart{};
+
 		Bus bus{ memory, 0 };
+		bus.map_device(uart, 0x1000'0000u);
 
 		Cpu cpu{};
 		cpu.set_pc(entry);
@@ -33,75 +37,80 @@ int main(int argc, char** argv) {
 		auto result{ run_until_trap(cpu, bus, 1'000'000) };
 		auto rc{ EXIT_SUCCESS };
 
-		std::cout << "stopped by ";
+		std::cerr << "stopped by ";
 		if (result.trap.has_value()) {
 			switch (*result.trap) {
 				case TrapCause::BreakPoint: {
-					std::cout << "breakpoint\n";
+					std::cerr << "breakpoint\n";
 					break;
 				}
 
 				case TrapCause::EnvironmentCall: {
-					std::cout << "environment call\n";
+					std::cerr << "environment call\n";
 					break;
 				}
 
 				case TrapCause::IllegalInstruction: {
-					std::cout << "illegal instruction\n";
+					std::cerr << "illegal instruction\n";
 					rc = EXIT_FAILURE;
 					break;
 				}
 
 				case TrapCause::InstructionAddressMisaligned: {
-					std::cout << "instruction address misaligned\n";
+					std::cerr << "instruction address misaligned\n";
 					rc = EXIT_FAILURE;
 					break;
 				}
 
 				case TrapCause::LoadAddressMisaligned: {
-					std::cout << "load address misaligned\n";
+					std::cerr << "load address misaligned\n";
 					rc = EXIT_FAILURE;
 					break;
 				}
 
 				case TrapCause::StoreAddressMisaligned: {
-					std::cout << "store address misaligned\n";
+					std::cerr << "store address misaligned\n";
 					rc = EXIT_FAILURE;
 					break;
 				}
 
 				case TrapCause::InstructionAccessFault: {
-					std::cout << "instruction access fault\n";
+					std::cerr << "instruction access fault\n";
 					rc = EXIT_FAILURE;
 					break;
 				}
 
 				case TrapCause::LoadAccessFault: {
-					std::cout << "load access fault\n";
+					std::cerr << "load access fault\n";
 					rc = EXIT_FAILURE;
 					break;
 				}
 
 				case TrapCause::StoreAccessFault: {
-					std::cout << "store access fault\n";
+					std::cerr << "store access fault\n";
 					rc = EXIT_FAILURE;
 					break;
 				}
 			}
 		}
 		else {
-			std::cout << "instruction limit\n";
+			std::cerr << "instruction limit\n";
 			rc = EXIT_FAILURE;
 		}
 
-		std::cout << "instructions retired: " << result.instructions_retired << '\n';
-		std::cout << "final pc value: 0x" << std::hex << std::setw(8) << std::setfill('0') << cpu.read_pc() << '\n';
+		std::cerr << "instructions retired: " << result.instructions_retired << '\n';
+		std::cerr << "final pc value: 0x" << std::hex << std::setw(8) << std::setfill('0') << cpu.read_pc() << '\n';
 
-		std::cout << "register states:\n";
+		std::cerr << "register states:\n";
 		for (std::size_t i{}; i < 32; i++) {
-			std::cout << "x" << std::dec << i << ": 0x" << std::hex 
+			std::cerr << "x" << std::dec << i << ": 0x" << std::hex 
 				<< std::setw(8) << std::setfill('0') << cpu.read_register(i) << '\n';
 		}
+		
+		for (const auto& byte: uart.transmitted_bytes()) {
+			std::cout.put(static_cast<char>(byte));
+		}
+		std::cout.flush();
 
 		return rc;
 	} catch (const std::exception& e) {
