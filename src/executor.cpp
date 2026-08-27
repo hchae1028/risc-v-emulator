@@ -374,7 +374,6 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 
 			cpu.write_register(instruction.rd, cpu.read_pc() + 4);
 			return target;
-			break;
 		}
 
 		case Operation::Jalr: {
@@ -386,7 +385,6 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 
 			cpu.write_register(instruction.rd, cpu.read_pc() + 4);
 			return target;
-			break;
 		}
 
 		case Operation::Fence: {
@@ -395,17 +393,14 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 
 		case Operation::Ecall: {
 			throw Trap{ TrapCause::EnvironmentCall };
-			break;
 		}
 
 		case Operation::Ebreak: {
 			throw Trap{ TrapCause::BreakPoint };
-			break;
 		}
 
 		case Operation::Unknown: {
 			throw Trap{ TrapCause::IllegalInstruction };
-			break;
 		}
 
 	}
