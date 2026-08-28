@@ -2,6 +2,7 @@
 #include "decoder.hpp"
 #include "executor.hpp"
 #include "memory.hpp"
+#include "trap.hpp"
 #include <array>
 #include <cassert>
 #include <cstddef>

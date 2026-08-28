@@ -16,6 +16,7 @@ void assert_out_of_range(Function function) {
 }
 
 int main() {
+	constexpr std::uint16_t mstatus_address{ 0x300u };
 	constexpr std::uint16_t mtvec_address{ 0x305u };
 	constexpr std::uint16_t mepc_address{ 0x341u };
 	constexpr std::uint16_t mcause_address{ 0x342u };
@@ -33,6 +34,7 @@ int main() {
 		assert(register_value == 0);
 	}
 	assert(cpu.read_csr(mtvec_address) == 0);
+	assert(cpu.read_csr(mstatus_address) == 0x00001800u);
 	assert(cpu.read_csr(mepc_address) == 0);
 	assert(cpu.read_csr(mcause_address) == 0);
 	assert(cpu.read_csr(mtval_address) == 0);
@@ -72,6 +74,14 @@ int main() {
 	assert(cpu.read_csr(mcause_address) == 0x80000007u);
 	assert(cpu.read_csr(mtval_address) == 0xDEADBEEFu);
 
+	// This M-mode-only hart exposes MIE/MPIE and hardwires MPP to Machine mode
+	cpu.write_csr(mstatus_address, 0xFFFFFFFFu);
+	assert(cpu.read_csr(mstatus_address) == 0x00001888u);
+	cpu.write_csr(mstatus_address, 0u);
+	assert(cpu.read_csr(mstatus_address) == 0x00001800u);
+	cpu.write_csr(mstatus_address, (1u << 3) | (1u << 7));
+	assert(cpu.read_csr(mstatus_address) == 0x00001888u);
+
 	// CSR accesses do not disturb general registers or the PC
 	assert(cpu.read_pc() == 0x1000u);
 	assert(cpu.read_register(0) == 0);
@@ -85,6 +95,7 @@ int main() {
 	assert(cpu.read_csr(mepc_address) == 0xFFFFFFFCu);
 	assert(cpu.read_csr(mcause_address) == 0x80000007u);
 	assert(cpu.read_csr(mtval_address) == 0xDEADBEEFu);
+	assert(cpu.read_csr(mstatus_address) == 0x00001888u);
 
 	return 0;
 }

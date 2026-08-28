@@ -30,8 +30,8 @@ if(NOT emulator_error MATCHES "stopped by breakpoint")
 	message(FATAL_ERROR "emulator did not stop at EBREAK:\n${emulator_error}")
 endif()
 
-if(NOT emulator_error MATCHES "final pc value: 0x0000010c")
-	message(FATAL_ERROR "emulator did not preserve the trapping EBREAK PC:\n${emulator_error}")
+if(NOT emulator_error MATCHES "final pc value: 0x00000000")
+	message(FATAL_ERROR "emulator did not enter the default trap vector:\n${emulator_error}")
 endif()
 
 if(NOT emulator_error MATCHES "x2: 0x00010000")

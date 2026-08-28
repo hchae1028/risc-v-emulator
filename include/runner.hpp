@@ -2,6 +2,7 @@
 #define RUNNER_H_
 
 #include "executor.hpp"
+#include "trap.hpp"
 #include <cstddef>
 #include <optional>
 
@@ -9,7 +10,7 @@ class Cpu;
 class Bus;
 
 struct RunResult {
-	std::optional<TrapCause> trap;
+	std::optional<Trap> trap;
 	std::size_t instructions_retired;
 };
 

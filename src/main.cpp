@@ -38,8 +38,8 @@ int main(int argc, char** argv) {
 		auto rc{ EXIT_SUCCESS };
 
 		std::cerr << "stopped by ";
-		if (result.trap.has_value()) {
-			switch (*result.trap) {
+		if (result.trap) {
+			switch (result.trap->cause) {
 				case TrapCause::BreakPoint: {
 					std::cerr << "breakpoint\n";
 					break;

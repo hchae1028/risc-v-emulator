@@ -34,6 +34,10 @@ add_executable(bus_test)
 add_executable(uart_device_test)
 add_executable(uart_execution_test)
 add_executable(csr_instruction_test)
+add_executable(mret_test)
+add_executable(trap_metadata_test)
+add_executable(trap_entry_test)
+add_executable(trap_delivery_test)
 add_executable(fetch_test)
 add_executable(decoder_test)
 add_executable(execute_test)
@@ -76,6 +80,26 @@ target_sources(uart_execution_test
 target_sources(csr_instruction_test
 	PRIVATE
 		tests/csr_instruction_test.cpp
+)
+
+target_sources(mret_test
+	PRIVATE
+		tests/mret_test.cpp
+)
+
+target_sources(trap_metadata_test
+	PRIVATE
+		tests/trap_metadata_test.cpp
+)
+
+target_sources(trap_entry_test
+	PRIVATE
+		tests/trap_entry_test.cpp
+)
+
+target_sources(trap_delivery_test
+	PRIVATE
+		tests/trap_delivery_test.cpp
 )
 
 target_sources(fetch_test
@@ -168,6 +192,26 @@ target_link_libraries(csr_instruction_test
 		riscv_core
 )
 
+target_link_libraries(mret_test
+	PRIVATE
+		riscv_core
+)
+
+target_link_libraries(trap_metadata_test
+	PRIVATE
+		riscv_core
+)
+
+target_link_libraries(trap_entry_test
+	PRIVATE
+		riscv_core
+)
+
+target_link_libraries(trap_delivery_test
+	PRIVATE
+		riscv_core
+)
+
 target_link_libraries(decoder_test
 	PRIVATE
 		riscv_core
@@ -211,6 +255,10 @@ enable_project_warnings(bus_test)
 enable_project_warnings(uart_device_test)
 enable_project_warnings(uart_execution_test)
 enable_project_warnings(csr_instruction_test)
+enable_project_warnings(mret_test)
+enable_project_warnings(trap_metadata_test)
+enable_project_warnings(trap_entry_test)
+enable_project_warnings(trap_delivery_test)
 enable_project_warnings(fetch_test)
 enable_project_warnings(decoder_test)
 enable_project_warnings(execute_test)
@@ -248,6 +296,26 @@ add_test(
 add_test(
 	NAME csr_instruction_test
 	COMMAND csr_instruction_test
+)
+
+add_test(
+	NAME mret_test
+	COMMAND mret_test
+)
+
+add_test(
+	NAME trap_metadata_test
+	COMMAND trap_metadata_test
+)
+
+add_test(
+	NAME trap_entry_test
+	COMMAND trap_entry_test
+)
+
+add_test(
+	NAME trap_delivery_test
+	COMMAND trap_delivery_test
 )
 
 add_test(

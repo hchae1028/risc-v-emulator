@@ -97,7 +97,8 @@ Instruction decode_instruction(std::uint32_t instruction_word) {
 		.rs2 = rs2,
 		.funct7 = funct7,
 		.imm = imm,
-		.csr = csr
+		.csr = csr,
+		.word = instruction_word
 	};
 }
 
@@ -269,6 +270,9 @@ Operation decode_operation(Instruction instruction) {
 					}
 					else if (instruction.rd == 0 && instruction.rs1 == 0 && instruction.imm == 1) {
 						return Operation::Ebreak;
+					}
+					else if (instruction.csr == 0x302u && instruction.rs1 == 0 && instruction.rd == 0) {
+						return Operation::Mret;
 					}
 					break;
 				}

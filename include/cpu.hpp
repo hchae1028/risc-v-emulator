@@ -6,6 +6,7 @@
 #include <array>
 
 class Bus;
+struct Trap;
 
 class Cpu {
 private:
@@ -16,11 +17,18 @@ private:
 	static constexpr std::uint16_t MEPC_ADDRESS { 0x341u };
 	static constexpr std::uint16_t MCAUSE_ADDRESS { 0x342u };
 	static constexpr std::uint16_t MTVAL_ADDRESS { 0x343u };
+	static constexpr std::uint16_t MSTATUS_ADDRESS { 0x300u };
+
+	static constexpr std::uint32_t MSTATUS_MIE_MASK{ 1 << 3 };
+	static constexpr std::uint32_t MSTATUS_MPIE_MASK{ 1 << 7 };
+	static constexpr std::uint32_t MSTATUS_MPP_MASK{ 0b11 << 11 };
+	static constexpr std::uint32_t MSTATUS_WRITABLE_MASK{ MSTATUS_MIE_MASK | MSTATUS_MPIE_MASK };
 	
 	std::uint32_t m_mtvec{};
 	std::uint32_t m_mepc{};
 	std::uint32_t m_mcause{};
 	std::uint32_t m_mtval{};
+	std::uint32_t m_mstatus{ MSTATUS_MPP_MASK };
 
 public:
 	Cpu();
@@ -42,6 +50,8 @@ public:
 	std::uint32_t fetch_instruction(Bus& bus) const;
 
 	void step(Bus& bus);
+
+	void take_trap(const Trap& trap);
 };
 
 #endif

@@ -12,6 +12,7 @@ struct Instruction {
 	std::uint8_t funct7;
 	std::uint32_t imm;
 	std::uint16_t csr;
+	std::uint32_t word;
 };
 
 enum class Operation {
@@ -61,6 +62,7 @@ enum class Operation {
 	CsrrwI,
 	CsrrsI,
 	CsrrcI,
+	Mret,
 	Unknown
 };
 

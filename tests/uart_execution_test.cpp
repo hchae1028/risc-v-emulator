@@ -9,6 +9,7 @@
 
 int main() {
 	constexpr std::uint32_t uart_base{ 0x10000000u };
+	constexpr std::uint16_t mepc{ 0x341u };
 	Memory ram{ 32 };
 	UartDevice uart{};
 	Bus bus{};
@@ -28,9 +29,10 @@ int main() {
 	Cpu cpu{};
 	const auto result{ run_until_trap(cpu, bus, 16) };
 	assert(result.trap.has_value());
-	assert(*result.trap == TrapCause::BreakPoint);
+	assert(result.trap->cause == TrapCause::BreakPoint);
 	assert(result.instructions_retired == 7);
-	assert(cpu.read_pc() == 28);
+	assert(cpu.read_pc() == 0);
+	assert(cpu.read_csr(mepc) == 28u);
 	assert(cpu.read_register(1) == uart_base);
 	assert(cpu.read_register(2) == 10);
 

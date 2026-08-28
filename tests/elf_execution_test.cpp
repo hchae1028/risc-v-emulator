@@ -66,6 +66,7 @@ std::vector<std::uint8_t> make_executable_elf() {
 }
 
 int main() {
+	constexpr std::uint16_t mepc{ 0x341u };
 	const auto elf_bytes{ make_executable_elf() };
 	Memory memory{ 512 };
 	const auto entry{ load_elf32(memory, elf_bytes) };
@@ -79,9 +80,10 @@ int main() {
 	assert(memory.read32(0x100u) == 0x00500093u);
 	assert(memory.read32(0x104u) == 0x00100073u);
 	assert(result.trap.has_value());
-	assert(*result.trap == TrapCause::BreakPoint);
+	assert(result.trap->cause == TrapCause::BreakPoint);
 	assert(result.instructions_retired == 1);
-	assert(cpu.read_pc() == 0x104u);
+	assert(cpu.read_pc() == 0u);
+	assert(cpu.read_csr(mepc) == 0x104u);
 	assert(cpu.read_register(1) == 5);
 
 	return 0;

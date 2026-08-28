@@ -3,6 +3,7 @@
 #include "decoder.hpp"
 #include "executor.hpp"
 #include "memory.hpp"
+#include "trap.hpp"
 #include <cassert>
 #include <cstdint>
 
@@ -31,6 +32,7 @@ void assert_illegal_instruction(Cpu& cpu, const Instruction& instruction, Bus& b
 }
 
 int main() {
+	constexpr std::uint16_t mstatus{ 0x300u };
 	constexpr std::uint16_t mtvec{ 0x305u };
 	constexpr std::uint16_t mepc{ 0x341u };
 	constexpr std::uint16_t mcause{ 0x342u };
@@ -123,6 +125,19 @@ int main() {
 	static_cast<void>(execute_instruction(immediate_cpu, instruction, bus));
 	assert(immediate_cpu.read_csr(mcause) == 0);
 
+	/* Zicsr writes to mstatus obey its writable-bit and hardwired-field policy */
+	Cpu status_cpu{};
+	status_cpu.write_register(1, 0xFFFFFFFFu);
+	instruction = decode_instruction(encode_csr(mstatus, 1, 0x1u, 2));
+	static_cast<void>(execute_instruction(status_cpu, instruction, bus));
+	assert(status_cpu.read_register(2) == 0x00001800u);
+	assert(status_cpu.read_csr(mstatus) == 0x00001888u);
+
+	instruction = decode_instruction(encode_csr(mstatus, 0, 0x5u, 3));
+	static_cast<void>(execute_instruction(status_cpu, instruction, bus));
+	assert(status_cpu.read_register(3) == 0x00001888u);
+	assert(status_cpu.read_csr(mstatus) == 0x00001800u);
+
 	/* Unsupported CSR accesses become precise illegal-instruction traps */
 	Cpu failed_cpu{};
 	failed_cpu.set_pc(0x40u);
@@ -172,7 +187,8 @@ int main() {
 		assert(trap.cause == TrapCause::BreakPoint);
 	}
 	assert(breakpoint_thrown);
-	assert(step_cpu.read_pc() == 12);
+	assert(step_cpu.read_pc() == 0);
+	assert(step_cpu.read_csr(mepc) == 12u);
 
 	return 0;
 }

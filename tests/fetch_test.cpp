@@ -5,6 +5,7 @@
 #include "cpu.hpp"
 #include "executor.hpp"
 #include "memory.hpp"
+#include "trap.hpp"
 
 int main() {
 	bool exception_thrown{ false };

@@ -3,6 +3,7 @@
 #include "decoder.hpp"
 #include "executor.hpp"
 #include "memory.hpp"
+#include "trap.hpp"
 #include <array>
 #include <cassert>
 #include <cstddef>
@@ -19,6 +20,7 @@ void step_with_ram(Cpu& cpu, Memory& ram) {
 }
 
 int main() {
+	constexpr std::uint16_t mepc{ 0x341u };
 	Cpu cpu{};
 	Memory memory{ 64 };
 
@@ -52,7 +54,7 @@ int main() {
 		registers_before_error[i] = cpu.read_register(i);
 	}
 
-	// Unknown instruction traps and leaves PC and registers unchanged
+	// Unknown instruction enters the trap handler without modifying registers
 	bool illegal_trap_thrown{ false };
 	TrapCause illegal_trap_cause{ TrapCause::BreakPoint };
 	try {
@@ -63,12 +65,13 @@ int main() {
 	}
 	assert(illegal_trap_thrown);
 	assert(illegal_trap_cause == TrapCause::IllegalInstruction);
-	assert(cpu.read_pc() == 12);
+	assert(cpu.read_pc() == 0);
+	assert(cpu.read_csr(mepc) == 12u);
 	for (std::size_t i = 0; i < registers_before_error.size(); i++) {
 		assert(cpu.read_register(i) == registers_before_error[i]);
 	}
 
-	// Aligned out-of-range PC leaves state unchanged
+	// An aligned out-of-range PC enters the trap handler precisely
 	cpu.set_pc(64);
 	bool exception_thrown{ false };
 	try {
@@ -78,7 +81,8 @@ int main() {
 		assert(trap.cause == TrapCause::InstructionAccessFault);
 	}
 	assert(exception_thrown);
-	assert(cpu.read_pc() == 64);
+	assert(cpu.read_pc() == 0);
+	assert(cpu.read_csr(mepc) == 64u);
 	for (std::size_t i = 0; i < registers_before_error.size(); i++) {
 		assert(cpu.read_register(i) == registers_before_error[i]);
 	}
@@ -235,7 +239,7 @@ int main() {
 	assert(load_memory.read32(20) == 0x89ABCDEFu);
 	assert(load_memory.read32(32) == 0x12345678u);
 
-	// A failed load through step leaves PC, registers, and memory unchanged
+	// A failed load preserves its destination register and memory
 	Cpu failed_load_cpu{};
 	Memory failed_load_memory{ 16 };
 	failed_load_memory.write32(0, 0x00202183); // LW x3, 2(x0)
@@ -279,7 +283,7 @@ int main() {
 	assert(store_cpu.read_register(2) == 0x12345678u);
 	assert(store_cpu.read_register(3) == 0x89ABCDEFu);
 
-	// A failed store through step leaves PC, registers, and memory unchanged
+	// A failed store preserves its source register and memory
 	Cpu failed_store_cpu{};
 	Memory failed_store_memory{ 16 };
 	failed_store_memory.write32(0, 0x00202123); // SW x2, 2(x0)
@@ -314,7 +318,7 @@ int main() {
 	assert(byte_load_cpu.read_register(4) == 0x00000080u);
 	assert(byte_load_memory.read8(17) == 0x80u);
 
-	// A failed byte load through step leaves architectural state unchanged
+	// A failed byte load preserves its destination register and memory
 	Cpu failed_byte_load_cpu{};
 	Memory failed_byte_load_memory{ 8 };
 	failed_byte_load_memory.write32(0, 0x00800183); // LB x3, 8(x0)
@@ -354,7 +358,7 @@ int main() {
 	assert(byte_store_cpu.read_register(2) == 0x12345680u);
 	assert(byte_store_cpu.read_register(3) == 0xABCDEF7Fu);
 
-	// A failed byte store through step leaves state unchanged
+	// A failed byte store preserves its source register and memory
 	Cpu failed_byte_store_cpu{};
 	Memory failed_byte_store_memory{ 8 };
 	failed_byte_store_memory.write32(0, 0x00200423); // SB x2, 8(x0)
@@ -391,7 +395,7 @@ int main() {
 	assert(halfword_load_cpu.read_register(1) == 16);
 	assert(halfword_load_memory.read16(18) == 0x8001u);
 
-	// A failed halfword load through step leaves state unchanged
+	// A failed halfword load preserves its destination register and memory
 	Cpu failed_halfword_load_cpu{};
 	Memory failed_halfword_load_memory{ 8 };
 	failed_halfword_load_memory.write32(0, 0x00101183); // LH x3, 1(x0)
@@ -431,7 +435,7 @@ int main() {
 	assert(halfword_store_cpu.read_register(2) == 0x12348001u);
 	assert(halfword_store_cpu.read_register(3) == 0xABCD7FFFu);
 
-	// A failed halfword store through step leaves state unchanged
+	// A failed halfword store preserves its source register and memory
 	Cpu failed_halfword_store_cpu{};
 	Memory failed_halfword_store_memory{ 8 };
 	failed_halfword_store_memory.write32(0, 0x002010A3); // SH x2, 1(x0)
@@ -490,7 +494,7 @@ int main() {
 	step_with_ram(not_taken_branch_cpu, not_taken_branch_memory);
 	assert(not_taken_branch_cpu.read_pc() == 4);
 
-	// A taken misaligned target leaves architectural state unchanged
+	// A taken misaligned target preserves registers and memory before trap entry
 	Cpu failed_branch_cpu{};
 	Memory failed_branch_memory{ 8 };
 	failed_branch_cpu.write_register(1, 42);
@@ -665,7 +669,7 @@ int main() {
 	assert(jal_memory.read32(4) == 0x00100113u);
 	assert(jal_memory.read32(8) == 0x00200113u);
 
-	// A failed JAL through step leaves all architectural state unchanged
+	// A failed JAL preserves registers and memory before trap entry
 	Cpu failed_jal_cpu{};
 	Memory failed_jal_memory{ 8 };
 	failed_jal_cpu.write_register(1, 0xDEADBEEFu);
@@ -710,7 +714,7 @@ int main() {
 	assert(jalr_memory.read32(4) == 0x00100193u);
 	assert(jalr_memory.read32(8) == 0x00200193u);
 
-	// A failed JALR through step leaves all architectural state unchanged
+	// A failed JALR preserves registers and memory before trap entry
 	Cpu failed_jalr_cpu{};
 	Memory failed_jalr_memory{ 8 };
 	failed_jalr_cpu.write_register(1, 0xDEADBEEFu);
@@ -835,7 +839,7 @@ int main() {
 	assert(ebreak_memory.read32(0) == 0x00100073u);
 	assert(ebreak_memory.read32(4) == 0x5A5A5A5Au);
 
-	// Misaligned PC leaves state unchanged
+	// A misaligned PC enters the trap handler without changing registers
 	cpu.set_pc(2);
 	exception_thrown = false;
 	try {
@@ -845,7 +849,8 @@ int main() {
 		assert(trap.cause == TrapCause::InstructionAddressMisaligned);
 	}
 	assert(exception_thrown);
-	assert(cpu.read_pc() == 2);
+	assert(cpu.read_pc() == 0);
+	assert(cpu.read_csr(mepc) == 0u);
 	for (std::size_t i = 0; i < registers_before_error.size(); i++) {
 		assert(cpu.read_register(i) == registers_before_error[i]);
 	}

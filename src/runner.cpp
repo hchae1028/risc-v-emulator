@@ -14,7 +14,7 @@ RunResult run_until_trap(Cpu& cpu, Bus& bus, std::size_t max_instruction_count) 
 		}
 	} catch (const Trap& trap) {
 		return RunResult{
-			.trap = trap.cause,
+			.trap = trap,
 			.instructions_retired = instructions_retired
 		};
 	}

@@ -1,6 +1,7 @@
 #include "executor.hpp"
 #include "bus.hpp"
 #include "cpu.hpp"
+#include "trap.hpp"
 #include <bit>
 #include <cstdint>
 #include <optional>
@@ -8,19 +9,31 @@
 
 namespace {
 
-std::uint32_t read_csr_or_trap(Cpu& cpu, std::uint16_t address) {
+constexpr std::uint16_t MSTATUS_ADDRESS{ 0x300u };
+constexpr std::uint16_t MEPC_ADDRESS{ 0x341u };
+
+constexpr std::uint32_t MSTATUS_MIE_MASK{ 1 << 3 };
+constexpr std::uint32_t MSTATUS_MPIE_MASK{ 1 << 7 };
+
+std::uint32_t read_csr_or_trap(Cpu& cpu, std::uint16_t address, std::uint32_t word) {
 	try {
 		return cpu.read_csr(address);
 	} catch (const std::out_of_range&) {
-		throw Trap{ TrapCause::IllegalInstruction };
+		throw Trap{ 
+			.cause = TrapCause::IllegalInstruction,
+			.tval = word
+		};
 	}
 }
 
-void write_csr_or_trap(Cpu& cpu, std::uint16_t address, std::uint32_t value) {
+void write_csr_or_trap(Cpu& cpu, std::uint16_t address, std::uint32_t value, std::uint32_t word) {
 	try {
 		cpu.write_csr(address, value);
 	} catch (const std::out_of_range&) {
-		throw Trap{ TrapCause::IllegalInstruction };
+		throw Trap{ 
+			.cause = TrapCause::IllegalInstruction,
+			.tval = word
+		};
 	}
 }
 
@@ -162,14 +175,20 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 		case Operation::Lw: {
 			auto address{ cpu.read_register(instruction.rs1) + instruction.imm };
 			if (address % 4 != 0) {
-				throw Trap{ TrapCause::LoadAddressMisaligned };
+				throw Trap{
+					.cause = TrapCause::LoadAddressMisaligned,
+					.tval = address
+				};
 			}
 			
 			std::uint32_t value{};
 			try {
 				value = bus.read32(address);
 			} catch (const std::out_of_range&) {
-				throw Trap{ TrapCause::LoadAccessFault };
+				throw Trap{
+					.cause = TrapCause::LoadAccessFault,
+					.tval = address
+				};
 			}
 
 			cpu.write_register(instruction.rd, value);
@@ -179,14 +198,20 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 		case Operation::Sw: {
 			auto address{ cpu.read_register(instruction.rs1) + instruction.imm };
 			if (address % 4 != 0) {
-				throw Trap{ TrapCause::StoreAddressMisaligned };
+				throw Trap{
+					.cause = TrapCause::StoreAddressMisaligned, 
+					.tval = address
+				};
 			}
 			
 			auto rs2{ cpu.read_register(instruction.rs2) };
 			try {
 				bus.write32(address, rs2);
 			} catch (const std::out_of_range&) {
-				throw Trap{ TrapCause::StoreAccessFault };
+				throw Trap{
+					.cause = TrapCause::StoreAccessFault,
+					.tval = address
+				};
 			}
 			break;
 		}
@@ -198,7 +223,10 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			try {
 				result = bus.read8(address);
 			} catch (const std::out_of_range&) {
-				throw Trap{ TrapCause::LoadAccessFault };
+				throw Trap{
+					.cause = TrapCause::LoadAccessFault,
+					.tval = address
+				};
 			}
 
 			if ((result & 0x80u) != 0) {
@@ -216,7 +244,10 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			try {
 				result = bus.read8(address);
 			} catch (const std::out_of_range&) {
-				throw Trap{ TrapCause::LoadAccessFault };
+				throw Trap{
+					.cause = TrapCause::LoadAccessFault,
+					.tval = address
+				};
 			}
 
 			cpu.write_register(instruction.rd, result);
@@ -232,7 +263,10 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 				value = static_cast<std::uint8_t>(rs2);
 				bus.write8(address, value);
 			} catch (const std::out_of_range&) {
-				throw Trap{ TrapCause::StoreAccessFault };
+				throw Trap{
+					.cause = TrapCause::StoreAccessFault,
+					.tval = address
+				};
 			}
 
 			break;
@@ -241,14 +275,20 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 		case Operation::Lh: {
 			auto address{ cpu.read_register(instruction.rs1) + instruction.imm };
 			if (address % 2 != 0) {
-				throw Trap{ TrapCause::LoadAddressMisaligned };
+				throw Trap{
+					.cause = TrapCause::LoadAddressMisaligned,
+					.tval = address
+				};
 			}
 
 			std::uint32_t result{};
 			try {
 				result = bus.read16(address);
 			} catch (const std::out_of_range&) {
-				throw Trap{ TrapCause::LoadAccessFault };
+				throw Trap{
+					.cause = TrapCause::LoadAccessFault,
+					.tval = address
+				};
 			}
 
 			if ((result & 0x8000u) != 0) {
@@ -262,14 +302,20 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 		case Operation::Lhu: {
 			auto address{ cpu.read_register(instruction.rs1) + instruction.imm };
 			if (address % 2 != 0) {
-				throw Trap{ TrapCause::LoadAddressMisaligned };
+				throw Trap{ 
+					.cause = TrapCause::LoadAddressMisaligned,
+					.tval = address
+				};
 			}
 
 			std::uint32_t result{};
 			try {
 				result = bus.read16(address);
 			} catch (const std::out_of_range&) {
-				throw Trap{ TrapCause::LoadAccessFault };
+				throw Trap{
+					.cause = TrapCause::LoadAccessFault,
+					.tval = address
+				};
 			}	
 
 			cpu.write_register(instruction.rd, result);
@@ -279,7 +325,10 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 		case Operation::Sh: {
 			auto address{ cpu.read_register(instruction.rs1) + instruction.imm };
 			if (address % 2 != 0) {
-				throw Trap{ TrapCause::StoreAddressMisaligned };
+				throw Trap{
+					.cause = TrapCause::StoreAddressMisaligned,
+					.tval = address
+				};
 			}
 
 			std::uint16_t value{};
@@ -288,7 +337,10 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 				value = static_cast<std::uint16_t>(rs2);
 				bus.write16(address, value);
 			} catch (const std::out_of_range&) {
-				throw Trap{ TrapCause::StoreAccessFault };
+				throw Trap{
+					.cause = TrapCause::StoreAccessFault,
+					.tval = address
+				};
 			}
 
 			break;
@@ -299,7 +351,10 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			if (branch_taken) {
 				auto new_pc{ cpu.read_pc() + instruction.imm };
 				if (new_pc % 4 != 0) {
-					throw Trap{ TrapCause::InstructionAddressMisaligned };
+					throw Trap{
+						.cause = TrapCause::InstructionAddressMisaligned,
+						.tval = new_pc
+					};
 				}
 
 				return new_pc;
@@ -313,7 +368,10 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			if (branch_taken) {
 				auto new_pc{ cpu.read_pc() + instruction.imm };
 				if (new_pc % 4 != 0) {
-					throw Trap{ TrapCause::InstructionAddressMisaligned };
+					throw Trap{
+						.cause = TrapCause::InstructionAddressMisaligned,
+						.tval = new_pc
+					};
 				}
 
 				return new_pc;
@@ -330,7 +388,10 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			if (branch_taken) {
 				auto new_pc{ cpu.read_pc() + instruction.imm };
 				if (new_pc % 4 != 0) {
-					throw Trap{ TrapCause::InstructionAddressMisaligned };
+					throw Trap{
+						.cause = TrapCause::InstructionAddressMisaligned,
+						.tval = new_pc
+					};
 				}
 
 				return new_pc;
@@ -347,7 +408,10 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			if (branch_taken) {
 				auto new_pc{ cpu.read_pc() + instruction.imm };
 				if (new_pc % 4 != 0) {
-					throw Trap{ TrapCause::InstructionAddressMisaligned };
+					throw Trap{
+						.cause = TrapCause::InstructionAddressMisaligned,
+						.tval = new_pc
+					};
 				}
 
 				return new_pc;
@@ -361,7 +425,10 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			if (branch_taken) {
 				auto new_pc{ cpu.read_pc() + instruction.imm };
 				if (new_pc % 4 != 0) {
-					throw Trap{ TrapCause::InstructionAddressMisaligned };
+					throw Trap{
+						.cause = TrapCause::InstructionAddressMisaligned,
+						.tval = new_pc
+					};
 				}
 
 				return new_pc;
@@ -374,7 +441,10 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			if (branch_taken) {
 				auto new_pc{ cpu.read_pc() + instruction.imm };
 				if (new_pc % 4 != 0) {
-					throw Trap{ TrapCause::InstructionAddressMisaligned };
+					throw Trap{
+						.cause = TrapCause::InstructionAddressMisaligned,
+						.tval = new_pc
+					};
 				}
 
 				return new_pc;
@@ -390,7 +460,10 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 		case Operation::Jal: {
 			auto target{ cpu.read_pc() + instruction.imm };
 			if (target % 4 != 0) {
-				throw Trap{ TrapCause::InstructionAddressMisaligned };
+				throw Trap{
+					.cause = TrapCause::InstructionAddressMisaligned,
+					.tval = target
+				};
 			}
 
 			cpu.write_register(instruction.rd, cpu.read_pc() + 4);
@@ -401,7 +474,10 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			auto target{ cpu.read_register(instruction.rs1) + instruction.imm };
 			target &= ~(std::uint32_t{ 1 });
 			if (target % 4 != 0) {
-				throw Trap{ TrapCause::InstructionAddressMisaligned };
+				throw Trap{
+					.cause = TrapCause::InstructionAddressMisaligned,
+					.tval = target
+				};
 			}
 
 			cpu.write_register(instruction.rd, cpu.read_pc() + 4);
@@ -413,33 +489,39 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 		}
 
 		case Operation::Ecall: {
-			throw Trap{ TrapCause::EnvironmentCall };
+			throw Trap{
+				.cause = TrapCause::EnvironmentCall,
+				.tval = 0
+			};
 		}
 
 		case Operation::Ebreak: {
-			throw Trap{ TrapCause::BreakPoint };
+			throw Trap{ 
+				.cause = TrapCause::BreakPoint,
+				.tval = cpu.read_pc()
+			};
 		}
 		
 		case Operation::Csrrw: {
 			auto source{ cpu.read_register(instruction.rs1) };
 
 			if (instruction.rd == 0) {
-				write_csr_or_trap(cpu, instruction.csr, source);
+				write_csr_or_trap(cpu, instruction.csr, source, instruction.word);
 				break;
 			}
 
-			auto old{ read_csr_or_trap(cpu, instruction.csr) };
-			write_csr_or_trap(cpu, instruction.csr, source);
+			auto old{ read_csr_or_trap(cpu, instruction.csr, instruction.word) };
+			write_csr_or_trap(cpu, instruction.csr, source, instruction.word);
 			cpu.write_register(instruction.rd, old);
 			break;
 		}
 
 		case Operation::Csrrs: {
-			auto old{ read_csr_or_trap(cpu, instruction.csr) };
+			auto old{ read_csr_or_trap(cpu, instruction.csr, instruction.word) };
 
 			if (instruction.rs1 != 0) {
 				auto source{ cpu.read_register(instruction.rs1) };
-				write_csr_or_trap(cpu, instruction.csr, source | old);
+				write_csr_or_trap(cpu, instruction.csr, source | old, instruction.word);
 			}
 
 			cpu.write_register(instruction.rd, old);
@@ -447,11 +529,11 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 		}
 
 		case Operation::Csrrc: {
-			auto old{ read_csr_or_trap(cpu, instruction.csr) };
+			auto old{ read_csr_or_trap(cpu, instruction.csr, instruction.word) };
 
 			if (instruction.rs1 != 0) {
 				auto source{ cpu.read_register(instruction.rs1) };
-				write_csr_or_trap(cpu, instruction.csr, old & ~source);
+				write_csr_or_trap(cpu, instruction.csr, old & ~source, instruction.word);
 			}
 
 			cpu.write_register(instruction.rd, old);
@@ -462,22 +544,22 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 			auto source{ static_cast<std::uint32_t>(instruction.rs1) };
 
 			if (instruction.rd == 0) {
-				write_csr_or_trap(cpu, instruction.csr, source);
+				write_csr_or_trap(cpu, instruction.csr, source, instruction.word);
 				break;
 			}
 
-			auto old{ read_csr_or_trap(cpu, instruction.csr) };
-			write_csr_or_trap(cpu, instruction.csr, source);
+			auto old{ read_csr_or_trap(cpu, instruction.csr, instruction.word) };
+			write_csr_or_trap(cpu, instruction.csr, source, instruction.word);
 			cpu.write_register(instruction.rd, old);
 			break;
 		}
 
 		case Operation::CsrrsI: {
-			auto old{ read_csr_or_trap(cpu, instruction.csr) };
+			auto old{ read_csr_or_trap(cpu, instruction.csr, instruction.word) };
 			auto source{ static_cast<std::uint32_t>(instruction.rs1) };
 
 			if (source != 0) {
-				write_csr_or_trap(cpu, instruction.csr, old | source);
+				write_csr_or_trap(cpu, instruction.csr, old | source, instruction.word);
 			}
 
 			cpu.write_register(instruction.rd, old);
@@ -485,19 +567,38 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 		}
 
 		case Operation::CsrrcI: {
-			auto old{ read_csr_or_trap(cpu, instruction.csr) };
+			auto old{ read_csr_or_trap(cpu, instruction.csr, instruction.word) };
 			auto source{ static_cast<std::uint32_t>(instruction.rs1) };
 
 			if (source != 0) {
-				write_csr_or_trap(cpu, instruction.csr, old & ~source);
+				write_csr_or_trap(cpu, instruction.csr, old & ~source, instruction.word);
 			}
 
 			cpu.write_register(instruction.rd, old);
 			break;
 		}
 
+		case Operation::Mret: {
+			auto mstatus{ cpu.read_csr(MSTATUS_ADDRESS) };
+
+			if ((mstatus & MSTATUS_MPIE_MASK) != 0) {
+				mstatus |= MSTATUS_MIE_MASK;
+			}
+			else {
+				mstatus &= ~MSTATUS_MIE_MASK;
+			}
+
+			mstatus |= MSTATUS_MPIE_MASK;
+			cpu.write_csr(MSTATUS_ADDRESS, mstatus);
+			
+			return cpu.read_csr(MEPC_ADDRESS);
+		}
+
 		case Operation::Unknown: {
-			throw Trap{ TrapCause::IllegalInstruction };
+			throw Trap{ 
+				.cause = TrapCause::IllegalInstruction,
+				.tval = instruction.word
+			};
 		}
 
 	}
