@@ -1,9 +1,30 @@
 #include "executor.hpp"
 #include "bus.hpp"
+#include "cpu.hpp"
 #include <bit>
 #include <cstdint>
 #include <optional>
 #include <stdexcept>
+
+namespace {
+
+std::uint32_t read_csr_or_trap(Cpu& cpu, std::uint16_t address) {
+	try {
+		return cpu.read_csr(address);
+	} catch (const std::out_of_range&) {
+		throw Trap{ TrapCause::IllegalInstruction };
+	}
+}
+
+void write_csr_or_trap(Cpu& cpu, std::uint16_t address, std::uint32_t value) {
+	try {
+		cpu.write_csr(address, value);
+	} catch (const std::out_of_range&) {
+		throw Trap{ TrapCause::IllegalInstruction };
+	}
+}
+
+}
 
 std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& instruction, Bus& bus) {
 	switch (decode_operation(instruction)) {
@@ -397,6 +418,82 @@ std::optional<std::uint32_t> execute_instruction(Cpu& cpu, const Instruction& in
 
 		case Operation::Ebreak: {
 			throw Trap{ TrapCause::BreakPoint };
+		}
+		
+		case Operation::Csrrw: {
+			auto source{ cpu.read_register(instruction.rs1) };
+
+			if (instruction.rd == 0) {
+				write_csr_or_trap(cpu, instruction.csr, source);
+				break;
+			}
+
+			auto old{ read_csr_or_trap(cpu, instruction.csr) };
+			write_csr_or_trap(cpu, instruction.csr, source);
+			cpu.write_register(instruction.rd, old);
+			break;
+		}
+
+		case Operation::Csrrs: {
+			auto old{ read_csr_or_trap(cpu, instruction.csr) };
+
+			if (instruction.rs1 != 0) {
+				auto source{ cpu.read_register(instruction.rs1) };
+				write_csr_or_trap(cpu, instruction.csr, source | old);
+			}
+
+			cpu.write_register(instruction.rd, old);
+			break;
+		}
+
+		case Operation::Csrrc: {
+			auto old{ read_csr_or_trap(cpu, instruction.csr) };
+
+			if (instruction.rs1 != 0) {
+				auto source{ cpu.read_register(instruction.rs1) };
+				write_csr_or_trap(cpu, instruction.csr, old & ~source);
+			}
+
+			cpu.write_register(instruction.rd, old);
+			break;
+		}
+
+		case Operation::CsrrwI: {
+			auto source{ static_cast<std::uint32_t>(instruction.rs1) };
+
+			if (instruction.rd == 0) {
+				write_csr_or_trap(cpu, instruction.csr, source);
+				break;
+			}
+
+			auto old{ read_csr_or_trap(cpu, instruction.csr) };
+			write_csr_or_trap(cpu, instruction.csr, source);
+			cpu.write_register(instruction.rd, old);
+			break;
+		}
+
+		case Operation::CsrrsI: {
+			auto old{ read_csr_or_trap(cpu, instruction.csr) };
+			auto source{ static_cast<std::uint32_t>(instruction.rs1) };
+
+			if (source != 0) {
+				write_csr_or_trap(cpu, instruction.csr, old | source);
+			}
+
+			cpu.write_register(instruction.rd, old);
+			break;
+		}
+
+		case Operation::CsrrcI: {
+			auto old{ read_csr_or_trap(cpu, instruction.csr) };
+			auto source{ static_cast<std::uint32_t>(instruction.rs1) };
+
+			if (source != 0) {
+				write_csr_or_trap(cpu, instruction.csr, old & ~source);
+			}
+
+			cpu.write_register(instruction.rd, old);
+			break;
 		}
 
 		case Operation::Unknown: {

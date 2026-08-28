@@ -33,6 +33,7 @@ add_executable(memory_test)
 add_executable(bus_test)
 add_executable(uart_device_test)
 add_executable(uart_execution_test)
+add_executable(csr_instruction_test)
 add_executable(fetch_test)
 add_executable(decoder_test)
 add_executable(execute_test)
@@ -70,6 +71,11 @@ target_sources(uart_device_test
 target_sources(uart_execution_test
 	PRIVATE
 		tests/uart_execution_test.cpp
+)
+
+target_sources(csr_instruction_test
+	PRIVATE
+		tests/csr_instruction_test.cpp
 )
 
 target_sources(fetch_test
@@ -157,6 +163,11 @@ target_link_libraries(uart_execution_test
 		riscv_core
 )
 
+target_link_libraries(csr_instruction_test
+	PRIVATE
+		riscv_core
+)
+
 target_link_libraries(decoder_test
 	PRIVATE
 		riscv_core
@@ -199,6 +210,7 @@ enable_project_warnings(memory_test)
 enable_project_warnings(bus_test)
 enable_project_warnings(uart_device_test)
 enable_project_warnings(uart_execution_test)
+enable_project_warnings(csr_instruction_test)
 enable_project_warnings(fetch_test)
 enable_project_warnings(decoder_test)
 enable_project_warnings(execute_test)
@@ -231,6 +243,11 @@ add_test(
 add_test(
 	NAME uart_execution_test
 	COMMAND uart_execution_test
+)
+
+add_test(
+	NAME csr_instruction_test
+	COMMAND csr_instruction_test
 )
 
 add_test(

@@ -21,6 +21,41 @@ void Cpu::write_register(std::size_t index, std::uint32_t value) {
 	m_registers.at(index) = value;
 }
 
+std::uint32_t Cpu::read_csr(std::uint16_t address) const {
+	switch (address) {
+		case MTVEC_ADDRESS:
+			return m_mtvec;
+		case MEPC_ADDRESS:
+			return m_mepc;
+		case MCAUSE_ADDRESS:
+			return m_mcause;
+		case MTVAL_ADDRESS:
+			return m_mtval;
+		default:
+			throw std::out_of_range("error: unspported CSR address");
+	}
+}
+
+void Cpu::write_csr(std::uint16_t address, std::uint32_t value) {
+	switch (address) {
+        case MTVEC_ADDRESS:
+            m_mtvec = value & ~0x3u;
+            break;
+        case MEPC_ADDRESS:
+            m_mepc = value & ~0x3u;
+            break;
+        case MCAUSE_ADDRESS:
+            m_mcause = value;
+            break;
+        case MTVAL_ADDRESS:
+            m_mtval = value;
+            break;
+        default:
+            throw std::out_of_range{ "error: unsupported CSR address" };
+    }
+}
+
+
 std::uint32_t Cpu::fetch_instruction(Bus& bus) const {
 	if (m_pc % 4 != 0) {
 		throw Trap{ TrapCause::InstructionAddressMisaligned };

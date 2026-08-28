@@ -11,6 +11,7 @@ struct Instruction {
 	std::uint8_t rs2;
 	std::uint8_t funct7;
 	std::uint32_t imm;
+	std::uint16_t csr;
 };
 
 enum class Operation {
@@ -54,6 +55,12 @@ enum class Operation {
 	Fence,
 	Ecall,
 	Ebreak,
+	Csrrw,
+	Csrrs,
+	Csrrc,
+	CsrrwI,
+	CsrrsI,
+	CsrrcI,
 	Unknown
 };
 

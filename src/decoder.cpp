@@ -58,6 +58,7 @@ Instruction decode_instruction(std::uint32_t instruction_word) {
 	std::uint8_t rs2{ static_cast<std::uint8_t>((instruction_word >> 20) & 0x1Fu) };
 	std::uint8_t funct7{ static_cast<std::uint8_t>((instruction_word >> 25) & 0x7Fu) };
 	std::uint32_t imm{};
+	std::uint16_t csr{ static_cast<std::uint16_t>((instruction_word >> 20) & 0xFFFu) };
 	
 	switch (opcode) {
         case 0x03:
@@ -95,7 +96,8 @@ Instruction decode_instruction(std::uint32_t instruction_word) {
 		.rs1 = rs1,
 		.rs2 = rs2,
 		.funct7 = funct7,
-		.imm = imm
+		.imm = imm,
+		.csr = csr
 	};
 }
 
@@ -260,18 +262,31 @@ Operation decode_operation(Instruction instruction) {
 		}
 
 		case 0x73: {
-			if (instruction.funct3 == 0 && instruction.rd == 0
-	   			&& instruction.rs1 == 0 && instruction.imm == 0) {
-				return Operation::Ecall;
-			}
-			else if (instruction.funct3 == 0 && instruction.rd == 0
-	   			&& instruction.rs1 == 0 && instruction.imm == 1) {
-				return Operation::Ebreak;
+			switch (instruction.funct3) {
+				case 0x0: {
+					if (instruction.rd == 0 && instruction.rs1 == 0 && instruction.imm == 0) {
+						return Operation::Ecall;
+					}
+					else if (instruction.rd == 0 && instruction.rs1 == 0 && instruction.imm == 1) {
+						return Operation::Ebreak;
+					}
+					break;
+				}
+
+				case 0x1:
+					return Operation::Csrrw;
+				case 0x2: 
+					return Operation::Csrrs;
+				case 0x3: 
+					return Operation::Csrrc;
+				case 0x5: 
+					return Operation::CsrrwI;
+				case 0x6: 
+					return Operation::CsrrsI;
+				case 0x7: 
+					return Operation::CsrrcI;
 			}
 		}
-
-		default:
-			break;
 	}
 	return Operation::Unknown;
 }

@@ -660,10 +660,11 @@ int main() {
 	assert(instr.rs1 == 1);
 	assert(decode_operation(instr) == Operation::Unknown);
 
-	// CSR encodings are outside the current RV32I scope
+	// CSR instructions use the SYSTEM opcode and retain the raw CSR address
 	instr = decode_instruction(0x00001073);
 	assert(instr.funct3 == 1);
-	assert(decode_operation(instr) == Operation::Unknown);
+	assert(instr.csr == 0);
+	assert(decode_operation(instr) == Operation::Csrrw);
 
 	return 0;
 }
