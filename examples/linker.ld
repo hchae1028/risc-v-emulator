@@ -15,4 +15,10 @@ SECTIONS
 	{
 		*(.rodata*)
 	}
+
+	.bss :
+	{
+		*(.bss*)
+		*(COMMON)
+	}
 }

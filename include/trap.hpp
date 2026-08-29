@@ -13,6 +13,7 @@ enum class TrapCause: std::uint32_t {
 	StoreAddressMisaligned = 6,
 	StoreAccessFault = 7,
 	EnvironmentCall = 11,
+	MachineTimerInterrupt = 0x80000007
 };
 
 struct Trap {

@@ -13,22 +13,28 @@ private:
 	std::uint32_t m_pc{};
 	std::array<std::uint32_t, 32> m_registers{};
 
-	static constexpr std::uint16_t MTVEC_ADDRESS { 0x305u };
-	static constexpr std::uint16_t MEPC_ADDRESS { 0x341u };
-	static constexpr std::uint16_t MCAUSE_ADDRESS { 0x342u };
-	static constexpr std::uint16_t MTVAL_ADDRESS { 0x343u };
-	static constexpr std::uint16_t MSTATUS_ADDRESS { 0x300u };
+	static constexpr std::uint16_t MTVEC_ADDRESS{ 0x305u };
+	static constexpr std::uint16_t MEPC_ADDRESS{ 0x341u };
+	static constexpr std::uint16_t MCAUSE_ADDRESS{ 0x342u };
+	static constexpr std::uint16_t MTVAL_ADDRESS{ 0x343u };
+	static constexpr std::uint16_t MSTATUS_ADDRESS{ 0x300u };
+	static constexpr std::uint16_t MIP_ADDRESS{ 0x344u };
+	static constexpr std::uint16_t MIE_ADDRESS{ 0x304u };
 
 	static constexpr std::uint32_t MSTATUS_MIE_MASK{ 1 << 3 };
 	static constexpr std::uint32_t MSTATUS_MPIE_MASK{ 1 << 7 };
 	static constexpr std::uint32_t MSTATUS_MPP_MASK{ 0b11 << 11 };
 	static constexpr std::uint32_t MSTATUS_WRITABLE_MASK{ MSTATUS_MIE_MASK | MSTATUS_MPIE_MASK };
+	static constexpr std::uint32_t MIP_MTIP_MASK{ 1 << 7 };
+	static constexpr std::uint32_t MIE_MTIE_MASK{ 1 << 7 };
 	
 	std::uint32_t m_mtvec{};
 	std::uint32_t m_mepc{};
 	std::uint32_t m_mcause{};
 	std::uint32_t m_mtval{};
 	std::uint32_t m_mstatus{ MSTATUS_MPP_MASK };
+	std::uint32_t m_mip{};
+	std::uint32_t m_mie{};
 
 public:
 	Cpu();
@@ -52,6 +58,8 @@ public:
 	void step(Bus& bus);
 
 	void take_trap(const Trap& trap);
+
+	void set_machine_timer_interrupt(bool pending);
 };
 
 #endif

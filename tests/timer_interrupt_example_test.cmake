@@ -1,0 +1,39 @@
+if(NOT DEFINED EMULATOR OR NOT DEFINED GUEST_ELF)
+	message(FATAL_ERROR "EMULATOR and GUEST_ELF must be provided")
+endif()
+
+execute_process(
+	COMMAND "${EMULATOR}" "${GUEST_ELF}"
+	RESULT_VARIABLE emulator_result
+	OUTPUT_VARIABLE emulator_output
+	ERROR_VARIABLE emulator_error
+)
+
+if(NOT emulator_result EQUAL 0)
+	message(FATAL_ERROR
+		"emulator exited with ${emulator_result}\n"
+		"stdout:\n${emulator_output}\n"
+		"stderr:\n${emulator_error}"
+	)
+endif()
+
+set(expected_uart_output "timer x3\n")
+if(NOT emulator_output STREQUAL expected_uart_output)
+	message(FATAL_ERROR
+		"unexpected UART output\n"
+		"expected: [${expected_uart_output}]\n"
+		"actual:   [${emulator_output}]"
+	)
+endif()
+
+if(NOT emulator_error MATCHES "stopped by breakpoint")
+	message(FATAL_ERROR "timer guest did not stop at EBREAK:\n${emulator_error}")
+endif()
+
+if(NOT emulator_error MATCHES "x2: 0x00010000")
+	message(FATAL_ERROR "interrupt handler did not restore sp:\n${emulator_error}")
+endif()
+
+if(emulator_error MATCHES "x8: 0x00000000")
+	message(FATAL_ERROR "foreground work did not run while interrupts were active:\n${emulator_error}")
+endif()

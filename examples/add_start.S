@@ -9,4 +9,4 @@ _start:
 
 	call add
 
-	ebreak
+	 ebreak

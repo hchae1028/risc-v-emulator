@@ -34,6 +34,10 @@ std::uint32_t Cpu::read_csr(std::uint16_t address) const {
 			return m_mtval;
 		case MSTATUS_ADDRESS:
 			return m_mstatus;
+		case MIP_ADDRESS:
+			return m_mip;
+		case MIE_ADDRESS:
+			return m_mie;
 		default:
 			throw std::out_of_range("error: unspported CSR address");
 	}
@@ -55,6 +59,11 @@ void Cpu::write_csr(std::uint16_t address, std::uint32_t value) {
             break;
 		case MSTATUS_ADDRESS:
 			m_mstatus = (value & MSTATUS_WRITABLE_MASK) | MSTATUS_MPP_MASK;
+			break;
+		case MIP_ADDRESS:
+			break;
+		case MIE_ADDRESS:
+			m_mie = value & MIE_MTIE_MASK;
 			break;
         default:
             throw std::out_of_range{ "error: unsupported CSR address" };
@@ -81,6 +90,16 @@ std::uint32_t Cpu::fetch_instruction(Bus& bus) const {
 }
 
 void Cpu::step(Bus& bus) {
+	if ((m_mstatus & MSTATUS_MIE_MASK) != 0 && (m_mie & MIE_MTIE_MASK) != 0 && (m_mip & MIP_MTIP_MASK) != 0) {
+		Trap m_interrupt {
+			.cause = TrapCause::MachineTimerInterrupt,
+			.tval = 0
+		};
+
+		take_trap(m_interrupt);
+		throw m_interrupt;
+	}
+
 	try {
 		auto word{ fetch_instruction(bus) };
 		auto instr{ decode_instruction(word) };
@@ -109,4 +128,13 @@ void Cpu::take_trap(const Trap& trap) {
 	m_mstatus &= ~MSTATUS_MIE_MASK;
 	
 	m_pc = m_mtvec;
+}
+
+void Cpu::set_machine_timer_interrupt(bool pending) {
+	if (pending) {
+		m_mip |= MIP_MTIP_MASK;
+	}
+	else {
+		m_mip &= ~MIP_MTIP_MASK;
+	}
 }

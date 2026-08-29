@@ -12,6 +12,8 @@
 #include "elf_loader.hpp"
 #include "runner.hpp"
 #include "uart_device.hpp"
+#include "timer_device.hpp"
+#include "machine.hpp"
 
 int main(int argc, char** argv) {
 	if (argc != 2) {
@@ -27,14 +29,18 @@ int main(int argc, char** argv) {
 		auto entry{ load_elf32(memory, bytes) };
 
 		UartDevice uart{};
+		TimerDevice timer{};
 
 		Bus bus{ memory, 0 };
+		bus.map_device(timer, 0x0200'0000u);
 		bus.map_device(uart, 0x1000'0000u);
 
 		Cpu cpu{};
 		cpu.set_pc(entry);
 
-		auto result{ run_until_trap(cpu, bus, 1'000'000) };
+		Machine machine{ cpu, bus, timer }; 
+
+		auto result{ run_until_breakpoint(machine, 1'000'000) };
 		auto rc{ EXIT_SUCCESS };
 
 		std::cerr << "stopped by ";
@@ -88,6 +94,12 @@ int main(int argc, char** argv) {
 
 				case TrapCause::StoreAccessFault: {
 					std::cerr << "store access fault\n";
+					rc = EXIT_FAILURE;
+					break;
+				}
+
+				case TrapCause::MachineTimerInterrupt: {
+					std::cerr << "machine timer interrupt\n";
 					rc = EXIT_FAILURE;
 					break;
 				}
