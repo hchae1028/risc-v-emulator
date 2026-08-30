@@ -32,9 +32,11 @@ Compressed instructions, floating-point instructions, and other RISC-V extension
 
 The emulator contains 64KB of emulated RAM along with the following address map:
 
+```text
 RAM:    0x00000000 — 0x0000FFFF
 Timer:  0x02000000 — 0x0200000F
 UART:   0x10000000 — 0x10000007
+```
 
 A system bus maps physical addresses to RAM or memory-mapped devices.
 
