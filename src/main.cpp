@@ -5,7 +5,9 @@
 #include <cstdlib>
 #include <iomanip>
 #include <filesystem>
+#include <string_view>
 #include "cpu.hpp"
+#include "instruction_trace.hpp"
 #include "memory.hpp"
 #include "bus.hpp"
 #include "program_loader.hpp"
@@ -16,13 +18,23 @@
 #include "machine.hpp"
 
 int main(int argc, char** argv) {
-	if (argc != 2) {
-		std::cerr << "usage: risc-v-emulator <program.elf>\n";
+	bool trace_enabled{};
+	std::filesystem::path program_path;
+
+	if (argc == 2) {
+		program_path = argv[1];
+	}
+	else if (argc == 3 && std::string_view{ argv[1] } == "--trace") {
+		trace_enabled = true;
+		program_path = argv[2];
+	}
+	else {
+		std::cerr << "usage: risc-v-emulator [--trace] <program.elf>\n";
 		return EXIT_FAILURE;
 	}
 
 	try {	
-		auto bytes{ read_binary_file(std::filesystem::path{ argv[1] }) };
+		auto bytes{ read_binary_file(program_path) };
 		constexpr std::size_t memory_size{ 64 * 1024 };
 
 		Memory memory{ memory_size };
@@ -40,10 +52,19 @@ int main(int argc, char** argv) {
 
 		Machine machine{ cpu, bus, timer }; 
 
-		auto result{ run_until_breakpoint(machine, 1'000'000) };
+		InstructionTraceCallBack trace{};
+
+		if (trace_enabled) {
+			trace = [](const InstructionTrace& event) {
+				std::cerr << "pc=0x" << std::hex << std::setw(8) << std::setfill('0') << event.pc
+					<< " instruction=0x" << std::setw(8) << event.instruction << "\n";
+			};
+		}
+
+		auto result{ run_until_breakpoint(machine, 1'000'000, trace) };
 		auto rc{ EXIT_SUCCESS };
 
-		std::cerr << "stopped by ";
+		std::cerr << "\nstopped by ";
 		if (result.trap) {
 			switch (result.trap->cause) {
 				case TrapCause::BreakPoint: {
@@ -110,7 +131,7 @@ int main(int argc, char** argv) {
 			rc = EXIT_FAILURE;
 		}
 
-		std::cerr << "instructions retired: " << result.instructions_retired << '\n';
+		std::cerr << std::dec << "instructions retired: " << result.instructions_retired << '\n';
 		std::cerr << "final pc value: 0x" << std::hex << std::setw(8) << std::setfill('0') << cpu.read_pc() << '\n';
 
 		std::cerr << "register states:\n";

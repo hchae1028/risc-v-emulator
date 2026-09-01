@@ -39,6 +39,7 @@ add_executable(timer_interrupt_csr_test)
 add_executable(timer_interrupt_delivery_test)
 add_executable(machine_test)
 add_executable(machine_runner_test)
+add_executable(instruction_trace_test)
 add_executable(uart_execution_test)
 add_executable(csr_instruction_test)
 add_executable(mret_test)
@@ -102,6 +103,11 @@ target_sources(machine_test
 target_sources(machine_runner_test
 	PRIVATE
 		tests/machine_runner_test.cpp
+)
+
+target_sources(instruction_trace_test
+	PRIVATE
+		tests/instruction_trace_test.cpp
 )
 
 target_sources(uart_execution_test
@@ -239,6 +245,11 @@ target_link_libraries(machine_runner_test
 		riscv_core
 )
 
+target_link_libraries(instruction_trace_test
+	PRIVATE
+		riscv_core
+)
+
 target_link_libraries(uart_execution_test
 	PRIVATE
 		riscv_core
@@ -315,6 +326,7 @@ enable_project_warnings(timer_interrupt_csr_test)
 enable_project_warnings(timer_interrupt_delivery_test)
 enable_project_warnings(machine_test)
 enable_project_warnings(machine_runner_test)
+enable_project_warnings(instruction_trace_test)
 enable_project_warnings(uart_execution_test)
 enable_project_warnings(csr_instruction_test)
 enable_project_warnings(mret_test)
@@ -373,6 +385,11 @@ add_test(
 add_test(
 	NAME machine_runner_test
 	COMMAND machine_runner_test
+)
+
+add_test(
+	NAME instruction_trace_test
+	COMMAND instruction_trace_test
 )
 
 add_test(
@@ -557,6 +574,14 @@ if(RISCV_GCC)
 			-DEMULATOR=$<TARGET_FILE:risc-v-emulator>
 			-DGUEST_ELF=${TIMER_INTERRUPT_ELF}
 			-P ${CMAKE_CURRENT_SOURCE_DIR}/tests/timer_interrupt_example_test.cmake
+	)
+
+	add_test(
+		NAME instruction_trace_cli_test
+		COMMAND ${CMAKE_COMMAND}
+			-DEMULATOR=$<TARGET_FILE:risc-v-emulator>
+			-DGUEST_ELF=${TIMER_INTERRUPT_ELF}
+			-P ${CMAKE_CURRENT_SOURCE_DIR}/tests/instruction_trace_cli_test.cmake
 	)
 
 	message(STATUS "RISC-V cross-compiler found: ${RISCV_GCC}")

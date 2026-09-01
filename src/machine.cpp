@@ -1,6 +1,7 @@
 #include "machine.hpp"
 #include "cpu.hpp"
 #include "timer_device.hpp"
+#include "instruction_trace.hpp"
 
 Machine::Machine(Cpu& cpu, Bus& bus, TimerDevice& timer)
 	: m_cpu{ cpu },
@@ -9,10 +10,10 @@ Machine::Machine(Cpu& cpu, Bus& bus, TimerDevice& timer)
 {
 }
 
-void Machine::step() {
+void Machine::step(const InstructionTraceCallBack& trace) {
 	m_timer.tick();
 	auto pending{ m_timer.interrupt_pending() };
 
 	m_cpu.set_machine_timer_interrupt(pending);
-	m_cpu.step(m_bus);
+	m_cpu.step(m_bus, trace);
 }

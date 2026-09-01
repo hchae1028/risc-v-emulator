@@ -4,9 +4,11 @@
 #include <cstdint>
 #include <cstddef>
 #include <array>
+#include "instruction_trace.hpp"
 
 class Bus;
 struct Trap;
+
 
 class Cpu {
 private:
@@ -55,7 +57,7 @@ public:
 
 	std::uint32_t fetch_instruction(Bus& bus) const;
 
-	void step(Bus& bus);
+	void step(Bus& bus, const InstructionTraceCallBack& trace = {});
 
 	void take_trap(const Trap& trap);
 

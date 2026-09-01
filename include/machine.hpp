@@ -4,6 +4,7 @@
 #include "cpu.hpp"
 #include "bus.hpp"
 #include "timer_device.hpp"
+#include "instruction_trace.hpp"
 
 class Machine {
 private:
@@ -14,7 +15,7 @@ private:
 public:
 	Machine(Cpu& cpu, Bus& bus, TimerDevice& timer);
 
-	void step();
+	void step(const InstructionTraceCallBack& trace = {});
 };
 
 #endif

@@ -3,6 +3,7 @@
 #include "executor.hpp"
 #include "bus.hpp"
 #include "trap.hpp"
+#include "instruction_trace.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -89,7 +90,7 @@ std::uint32_t Cpu::fetch_instruction(Bus& bus) const {
 	}
 }
 
-void Cpu::step(Bus& bus) {
+void Cpu::step(Bus& bus, const InstructionTraceCallBack& trace) {
 	if ((m_mstatus & MSTATUS_MIE_MASK) != 0 && (m_mie & MIE_MTIE_MASK) != 0 && (m_mip & MIP_MTIP_MASK) != 0) {
 		Trap m_interrupt {
 			.cause = TrapCause::MachineTimerInterrupt,
@@ -101,10 +102,19 @@ void Cpu::step(Bus& bus) {
 	}
 
 	try {
+		auto pc{ m_pc };
 		auto word{ fetch_instruction(bus) };
-		auto instr{ decode_instruction(word) };
 
+		if (trace) {
+			trace(InstructionTrace{
+				.pc = pc,
+				.instruction = word
+			});
+		}
+
+		auto instr{ decode_instruction(word) };
 		auto returned{ execute_instruction(*this, instr, bus) };
+
 		if (returned == std::nullopt) {
 			m_pc += 4;
 		}

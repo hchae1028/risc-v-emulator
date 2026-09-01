@@ -2,6 +2,7 @@
 #define RUNNER_H_
 
 #include "executor.hpp"
+#include "instruction_trace.hpp"
 #include "trap.hpp"
 #include <cstddef>
 #include <optional>
@@ -17,6 +18,6 @@ struct RunResult {
 
 RunResult run_until_trap(Cpu& cpu, Bus& bus, std::size_t max_instruction_count);
 
-RunResult run_until_breakpoint(Machine& machine, std::size_t max_step_count);
+RunResult run_until_breakpoint(Machine& machine, std::size_t max_step_count, const InstructionTraceCallBack& trace = {});
 
 #endif
